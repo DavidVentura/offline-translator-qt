@@ -7,6 +7,10 @@ packaging/postmarketos/src/
 packaging/postmarketos/**/*.gz
 packaging/postmarketos/pkg/*
 packaging/postmarketos/packages/*
+packaging/flatpak/build/
+packaging/flatpak/repo/
+packaging/flatpak/stage/
+packaging/flatpak/*.flatpak
 build/
 runtime-lib/*
 .clickable/*

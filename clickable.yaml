@@ -10,6 +10,7 @@ env_vars:
   QT_INCLUDE_PATH: /usr/include/${ARCH_TRIPLET}/qt5
   QT_LIBRARY_PATH: /usr/lib/${ARCH_TRIPLET}
   BINDGEN_EXTRA_CLANG_ARGS_aarch64_unknown_linux_gnu: --target=aarch64-linux-gnu --sysroot=/ -I/usr/lib/gcc-cross/aarch64-linux-gnu/13/include -I/usr/aarch64-linux-gnu/include
+  BINDGEN_EXTRA_CLANG_ARGS_x86_64_unknown_linux_gnu: --target=x86_64-linux-gnu --sysroot=/ -I/usr/lib/gcc/x86_64-linux-gnu/13/include -I/usr/include/x86_64-linux-gnu
 kill: offline-translator-linux
 install_qml:
 - qml/*.qml

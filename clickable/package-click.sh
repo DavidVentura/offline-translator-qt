@@ -25,17 +25,44 @@ if [ -d "$translator_host_path" ]; then
   fi
 fi
 
+canonical_ort_arch() {
+  case "$1" in
+    arm64|aarch64|arm64-v8a)
+      echo "aarch64"
+      ;;
+    amd64|x86_64)
+      echo "x86_64"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 ort_build_arch="${ORT_BUILD_ARCH:-}"
+if [ -n "$ort_build_arch" ]; then
+  if ! ort_build_arch="$(canonical_ort_arch "$ort_build_arch")"; then
+    echo "Unsupported ONNX Runtime target architecture: ${ORT_BUILD_ARCH}" >&2
+    exit 1
+  fi
+fi
+
 if [ -z "$ort_build_arch" ]; then
   args=("$@")
   for ((i=0; i<${#args[@]}; i++)); do
     if { [ "${args[$i]}" = "--arch" ] || [ "${args[$i]}" = "-a" ]; } && [ $((i + 1)) -lt ${#args[@]} ]; then
-      case "${args[$((i + 1))]}" in
-        arm64) ort_build_arch="aarch64" ;;
-        amd64) ort_build_arch="x86_64" ;;
-      esac
+      if ! ort_build_arch="$(canonical_ort_arch "${args[$((i + 1))]}")"; then
+        echo "Unsupported ONNX Runtime target architecture: ${args[$((i + 1))]}" >&2
+        exit 1
+      fi
     fi
   done
+fi
+
+if [ -z "$ort_build_arch" ]; then
+  if ! ort_build_arch="$(canonical_ort_arch "$(uname -m)")"; then
+    ort_build_arch=""
+  fi
 fi
 
 if [ -n "$ort_build_arch" ]; then
