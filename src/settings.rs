@@ -13,7 +13,7 @@ pub struct Settings {
     pub ocr_background_mode: String,
     #[serde(default = "default_ocr_min_confidence")]
     pub ocr_min_confidence: i32,
-    #[serde(default = "default_ocr_max_image_size")]
+    #[serde(default = "default_ocr_max_image_size_2")]
     pub ocr_max_image_size: i32,
     #[serde(default = "default_catalog_index_url")]
     pub catalog_index_url: String,
@@ -41,7 +41,7 @@ fn default_ocr_min_confidence() -> i32 {
     75
 }
 fn default_ocr_max_image_size() -> i32 {
-    1500
+    1000
 }
 fn default_catalog_index_url() -> String {
     "https://offline-translator.davidv.dev/index".to_string()

@@ -154,7 +154,7 @@ Item {
                         DarkSlider {
                             Layout.fillWidth: true; Layout.preferredHeight: ui.dp(28)
                             theme: root.theme
-                            from: 1500; to: 4000; stepSize: 100
+                            from: 700; to: 1400; stepSize: 100
                             value: appBridge.ocr_max_image_size
                             onMoved: appBridge.set_ocr_max_image_size_value(value)
                         }
