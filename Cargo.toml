@@ -12,7 +12,7 @@ qttypes = "0.2"
 cpp = "0.5"
 flate2 = "1.0"
 rayon = "1.10"
-translator = { git = "https://github.com/DavidVentura/translator-rs.git", features = ["tesseract", "tts", "transliterate", "mucab", "dictionary"] }
+translator = { git = "https://github.com/DavidVentura/translator-rs.git", features = ["tesseract", "tts", "transliterate", "mucab", "dictionary", "ppocr", "planar-tracker"] }
 # translator = { path = "/home/david/git/translator-rs", features = ["tesseract", "tts", "transliterate", "mucab", "dictionary"] }
 whoami = { version = "1.6.1", default-features = false }
 zip = "2.4.2"

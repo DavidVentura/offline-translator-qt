@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use image::{GenericImageView, ImageDecoder, ImageReader, imageops::FilterType};
-use translator::{BackgroundMode, TranslatorSession};
+use translator::{BackgroundMode, OcrSourceSelection, PreferredOcrEngine, TranslatorSession};
 
 #[derive(Debug, Clone)]
 pub struct ImageOverlayLine {
@@ -89,11 +89,13 @@ pub fn translate_image_with_session(
             &loaded.rgba_bytes,
             loaded.width,
             loaded.height,
-            source_code,
+            max_image_size,
+            OcrSourceSelection::specific(source_code),
             target_code,
             min_confidence,
             translator::ReadingOrder::LeftToRight,
             background_mode,
+            PreferredOcrEngine::Paddle,
         )
         .map_err(|err| {
             if err.is_missing_asset() {

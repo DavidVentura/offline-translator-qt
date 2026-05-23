@@ -179,7 +179,7 @@ fn play_text_streaming(
 ) -> Result<(), String> {
     let planning_started_at = Instant::now();
     let planned_chunks = catch_tts_panic(|| -> Result<Option<Vec<SpeechChunk>>, String> {
-        match session.plan_speech_chunks(language_code, text) {
+        match session.plan_speech_chunks(language_code, text, None) {
             Ok(chunks) => Ok(Some(chunks)),
             Err(err) if err.is_missing_asset() => Ok(None),
             Err(err) => Err(err.message),
@@ -279,6 +279,7 @@ fn produce_audio_chunks(
                 speech_speed,
                 voice_name.as_deref(),
                 chunk.is_phonemes,
+                None,
             ) {
                 Ok(audio) => Ok(audio),
                 Err(err) if err.is_missing_asset() => {
