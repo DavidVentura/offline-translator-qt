@@ -1,10 +1,13 @@
-#![recursion_limit = "256"]
+// cpp! expands its body token-by-token recursively; the persistent-texture
+// block in rendered_image_item.rs needs a higher limit than the default.
+#![recursion_limit = "1024"]
 
 mod catalog_state;
 mod data;
 mod download;
 mod eventloop;
 mod image_ocr;
+mod live_ocr;
 mod model;
 mod pulse;
 mod rendered_image_item;
@@ -26,6 +29,10 @@ use crate::settings::load_settings;
 use crate::ui::{AppBridge, create_ui_callbacks};
 
 const APP_NAME: &str = "dev.davidv.translator";
+
+unsafe extern "C" {
+    fn register_live_ocr_filter();
+}
 
 #[derive(Clone, Debug)]
 struct AppPaths {
@@ -92,7 +99,36 @@ fn get_app_paths() -> AppPaths {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::Builder::from_env(
+        env_logger::Env::default().default_filter_or("info,translator=debug"),
+    )
+    .init();
     configure_onnxruntime_dylib_path()?;
+
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(pos) = args.iter().position(|a| a == "--bench-live") {
+        let image = args.get(pos + 1).cloned().unwrap_or_default();
+        let from = args
+            .get(pos + 2)
+            .cloned()
+            .unwrap_or_else(|| "en".to_string());
+        let to = args
+            .get(pos + 3)
+            .cloned()
+            .unwrap_or_else(|| "nl".to_string());
+        let max_side = args
+            .get(pos + 4)
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap_or(1000);
+        let app_paths = get_app_paths();
+        let session = Arc::new(TranslatorSession::from_catalog(
+            bundled_catalog(),
+            app_paths.data.clone(),
+        ));
+        live_ocr::run_benchmark(session, &image, &from, &to, max_side, 60);
+        return Ok(());
+    }
+
     qmetaobject::log::init_qt_to_rust();
     qml_register_type::<rendered_image_item::RenderedImageItem>(
         c"TranslatorUi",
@@ -100,6 +136,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         0,
         c"RenderedImageItem",
     );
+    unsafe { register_live_ocr_filter() };
 
     let (bus_tx, bus_rx) = mpsc::channel::<IoEvent>();
     let app_paths = get_app_paths();
@@ -108,6 +145,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         catalog,
         app_paths.data.clone(),
     ));
+    live_ocr::init_live_pipeline(Arc::clone(&session));
     let initial_languages = languages_from_overview(session.language_overview());
     let main_qml = find_main_qml()?;
     let asset_dir = find_asset_dir(&main_qml)?;
@@ -126,6 +164,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     engine.set_object_property("app".into(), app.pinned());
 
     let ui_callbacks = create_ui_callbacks(QPointer::from(app.pinned().borrow()));
+    live_ocr::set_live_image_sink(ui_callbacks.set_live_camera_image.clone());
     let session_for_loop = Arc::clone(&session);
     let jh = std::thread::spawn(move || {
         eventloop::run_eventloop(bus_rx, ui_callbacks, session_for_loop)

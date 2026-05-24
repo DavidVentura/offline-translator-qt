@@ -13,7 +13,7 @@ pub struct Settings {
     pub ocr_background_mode: String,
     #[serde(default = "default_ocr_min_confidence")]
     pub ocr_min_confidence: i32,
-    #[serde(default = "default_ocr_max_image_size_2")]
+    #[serde(default = "default_ocr_max_image_size")]
     pub ocr_max_image_size: i32,
     #[serde(default = "default_catalog_index_url")]
     pub catalog_index_url: String,

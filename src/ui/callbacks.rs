@@ -14,6 +14,7 @@ pub struct UiCallbacks {
     pub set_tts_state: Arc<dyn Fn(bool, bool) + Send + Sync>,
     pub set_tts_voices: Arc<dyn Fn(bool, Vec<TtsVoiceListItem>, String, String) + Send + Sync>,
     pub set_processed_image: Arc<dyn Fn(QImage) + Send + Sync>,
+    pub set_live_camera_image: Arc<dyn Fn(QImage) + Send + Sync>,
     pub set_image_overlay: Arc<dyn Fn(Vec<ImageOverlayListItem>, f32, f32) + Send + Sync>,
     pub set_detected_language_code: Arc<dyn Fn(String) + Send + Sync>,
 }
@@ -73,6 +74,13 @@ pub fn create_ui_callbacks(app: QPointer<AppBridge>) -> UiCallbacks {
         }
     });
 
+    let live_camera_image_app = app.clone();
+    let set_live_camera_image = queued_callback(move |image: QImage| {
+        if let Some(app) = live_camera_image_app.as_pinned() {
+            app.borrow_mut().set_live_camera_image_value(image);
+        }
+    });
+
     let image_overlay_app = app.clone();
     let set_image_overlay = queued_callback(move |args: (Vec<ImageOverlayListItem>, f32, f32)| {
         if let Some(app) = image_overlay_app.as_pinned() {
@@ -102,6 +110,7 @@ pub fn create_ui_callbacks(app: QPointer<AppBridge>) -> UiCallbacks {
             },
         ),
         set_processed_image: Arc::new(set_processed_image),
+        set_live_camera_image: Arc::new(set_live_camera_image),
         set_image_overlay: Arc::new(move |items, width, height| {
             set_image_overlay((items, width, height))
         }),

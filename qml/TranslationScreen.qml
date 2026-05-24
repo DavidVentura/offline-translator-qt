@@ -682,6 +682,23 @@ Item {
         onClicked: if (imagePickerLoader.item) imagePickerLoader.item.open()
     }
 
+    RoundButton {
+        visible: !appBridge.disable_ocr
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: ui.dp(24)
+        anchors.bottomMargin: ui.dp(100)
+        width: ui.dp(64)
+        height: ui.dp(64)
+        text: "Live"
+        onClicked: appBridge.open_live_camera()
+        background: Rectangle {
+            radius: width / 2
+            color: parent.down ? Qt.darker(theme.accentColor, 1.15) : theme.accentColor
+            border.width: 0
+        }
+    }
+
     Rectangle {
         id: toastBubble
         visible: appBridge.toast_visible && appBridge.toast_message.length > 0

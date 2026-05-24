@@ -15,7 +15,7 @@ if [ -z "$clickable_bin" ]; then
   fi
 fi
 
-translator_host_path="/home/david/AndroidStudioProjects/Translator/translator"
+translator_host_path="/home/david/git/translator-rs"
 if [ -d "$translator_host_path" ]; then
   extra_mount="${translator_host_path}:${translator_host_path}:ro"
   if [ -n "${CLICKABLE_EXTRA_MOUNTS:-}" ]; then

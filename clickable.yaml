@@ -6,6 +6,8 @@ dependencies_host:
 - libpulse-dev
 dependencies_target:
 - libpulse-dev
+- qtmultimedia5-dev
+- qtdeclarative5-dev
 env_vars:
   QT_INCLUDE_PATH: /usr/include/${ARCH_TRIPLET}/qt5
   QT_LIBRARY_PATH: /usr/lib/${ARCH_TRIPLET}

@@ -28,6 +28,11 @@ impl AppBridge {
         }
     }
 
+    pub(crate) fn set_live_camera_image_value(&mut self, image: QImage) {
+        self.live_camera_image = image;
+        self.live_camera_image_changed();
+    }
+
     pub(crate) fn set_share_image_url_value(&mut self, url: String) {
         let url = QString::from(url);
         if self.share_image_url != url {

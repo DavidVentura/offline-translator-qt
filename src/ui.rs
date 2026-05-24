@@ -51,6 +51,12 @@ pub struct AppBridge {
     pub image_viewer_open: qt_property!(bool; NOTIFY image_viewer_open_changed),
     pub image_viewer_open_changed: qt_signal!(),
 
+    pub live_camera_open: qt_property!(bool; NOTIFY live_camera_open_changed),
+    pub live_camera_open_changed: qt_signal!(),
+
+    pub live_camera_image: qt_property!(QImage; NOTIFY live_camera_image_changed),
+    pub live_camera_image_changed: qt_signal!(),
+
     pub tts_available: qt_property!(bool; NOTIFY tts_available_changed),
     pub tts_available_changed: qt_signal!(),
 
@@ -385,6 +391,23 @@ pub struct AppBridge {
     pub camera_clicked: qt_method!(
         fn camera_clicked(&self) {
             println!("Camera clicked");
+        }
+    ),
+    pub open_live_camera: qt_method!(
+        fn open_live_camera(&mut self) {
+            self.live_camera_open = true;
+            self.live_camera_open_changed();
+        }
+    ),
+    pub close_live_camera: qt_method!(
+        fn close_live_camera(&mut self) {
+            self.live_camera_open = false;
+            self.live_camera_open_changed();
+        }
+    ),
+    pub set_live_viewport: qt_method!(
+        fn set_live_viewport(&self, width: i32, height: i32) {
+            crate::live_ocr::set_live_viewport(width.max(0) as u32, height.max(0) as u32);
         }
     ),
     pub process_image_selection: qt_method!(

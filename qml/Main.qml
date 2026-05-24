@@ -101,6 +101,21 @@ ApplicationWindow {
             }
         }
 
+        Loader {
+            id: liveCameraLoader
+            anchors.fill: parent
+            z: 100
+            active: app.live_camera_open
+            sourceComponent: active ? liveCameraComponent : null
+        }
+
+        Component {
+            id: liveCameraComponent
+            LiveCameraScreen {
+                appBridge: app
+            }
+        }
+
         Timer {
             id: automationStartupTimer
             interval: 250
