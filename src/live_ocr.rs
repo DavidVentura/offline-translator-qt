@@ -76,8 +76,20 @@ pub fn run_benchmark(
     for i in 0..frames {
         frame.reset_owned(rgba.clone(), w, h, 0);
         let started = Instant::now();
-        let result =
-            pipeline.process_frame(&frame, crop, &mut dst, w, h, w, h, w, h, true, timestamp_ns);
+        let mut target = translator::live_compositor::SliceTarget { dst: &mut dst[..] };
+        let result = pipeline.process_frame(
+            &frame,
+            crop,
+            &mut target,
+            w,
+            h,
+            w,
+            h,
+            w,
+            h,
+            true,
+            timestamp_ns,
+        );
         let frame_ms = started.elapsed().as_secs_f32() * 1000.0;
         match result {
             Ok(r) => eprintln!(
@@ -188,8 +200,9 @@ fn live_worker(session: Arc<TranslatorSession>, state: Arc<LiveState>) {
             bottom: fh,
         };
         let ts = start.elapsed().as_nanos() as u64;
+        let mut target = translator::live_compositor::SliceTarget { dst: &mut dst[..] };
         let result =
-            pipeline.process_frame(&frame, crop, &mut dst, fw, fh, fw, fh, fw, fh, true, ts);
+            pipeline.process_frame(&frame, crop, &mut target, fw, fh, fw, fh, fw, fh, true, ts);
         let filled = matches!(&result, Ok(r) if r.composite_bytes as usize == len);
 
         if filled {
