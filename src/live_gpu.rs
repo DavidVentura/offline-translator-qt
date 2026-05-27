@@ -9,7 +9,9 @@
 //!      the `LiveFrame` the tracker + det/rec work on (replaces the CPU `map` +
 //!      `transform_frame`).
 //!   3. `process_frame` (bundled) — tracker, then `ExternalPresentTarget`
-//!      composites the full-res external camera + overlays to the screen.
+//!      composites the full-res external camera + overlays into the owned
+//!      present FBO, which the `LiveCameraItem` scene-graph node then displays
+//!      (so the QML controls compose on top of it).
 //!
 //! `GlesRenderer` (`!Send`) lives in a render-thread `thread_local`.
 
@@ -54,6 +56,13 @@ const CANONICAL_MAX_SIDE: u32 = 1000;
 static CAMERA_TEX: AtomicU32 = AtomicU32::new(0);
 static CAMERA_W: AtomicU32 = AtomicU32::new(0);
 static CAMERA_H: AtomicU32 = AtomicU32::new(0);
+
+// The owned FBO color texture the composite renders into, published for the
+// `LiveCameraItem` scene-graph node to sample. Both the composite and the node
+// run on the render thread, so plain atomics suffice.
+static PRESENT_TEX: AtomicU32 = AtomicU32::new(0);
+static PRESENT_W: AtomicU32 = AtomicU32::new(0);
+static PRESENT_H: AtomicU32 = AtomicU32::new(0);
 
 /// Called from the video filter each frame: the camera frame's external-OES
 /// texture id (0 until qtvideo-node mints it) + sensor dims.
@@ -131,6 +140,11 @@ fn display_xform(fw: f32, fh: f32) -> [f32; 9] {
 struct RenderState {
     gl: glow::Context,
     gles: GlesRenderer,
+    /// Screen-sized RGBA FBO the composite renders into (instead of the screen),
+    /// so the scene graph can show it under the QML controls via a texture node.
+    present_fbo: Option<glow::Framebuffer>,
+    present_tex: Option<glow::Texture>,
+    present_size: Option<(u32, u32)>,
     start: Instant,
     frames: u32,
     gap_ms_sum: f32,
@@ -151,6 +165,9 @@ impl RenderState {
         Some(Self {
             gl: unsafe { glow::Context::from_loader_function(load_proc) },
             gles,
+            present_fbo: None,
+            present_tex: None,
+            present_size: None,
             start: Instant::now(),
             frames: 0,
             gap_ms_sum: 0.0,
@@ -158,6 +175,83 @@ impl RenderState {
             present_ms_sum: 0.0,
             last_present: None,
         })
+    }
+
+    /// (Re)create the screen-sized RGBA FBO + color texture the composite draws
+    /// into, and publish the texture id for the scene-graph node. The texture is
+    /// a plain `GL_TEXTURE_2D` (unlike the external-OES camera source), so a
+    /// stock `QSGSimpleTextureNode` can display it.
+    fn ensure_present_fbo(&mut self, w: u32, h: u32) {
+        if self.present_size == Some((w, h)) {
+            return;
+        }
+        let gl = &self.gl;
+        unsafe {
+            if let Some(t) = self.present_tex.take() {
+                gl.delete_texture(t);
+            }
+            let tex = gl.create_texture().expect("create present fbo texture");
+            gl.bind_texture(glow::TEXTURE_2D, Some(tex));
+            gl.tex_image_2d(
+                glow::TEXTURE_2D,
+                0,
+                glow::RGBA as i32,
+                w as i32,
+                h as i32,
+                0,
+                glow::RGBA,
+                glow::UNSIGNED_BYTE,
+                glow::PixelUnpackData::Slice(None),
+            );
+            gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_MIN_FILTER,
+                glow::LINEAR as i32,
+            );
+            gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_MAG_FILTER,
+                glow::LINEAR as i32,
+            );
+            gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_WRAP_S,
+                glow::CLAMP_TO_EDGE as i32,
+            );
+            gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_WRAP_T,
+                glow::CLAMP_TO_EDGE as i32,
+            );
+            let fbo = match self.present_fbo {
+                Some(f) => f,
+                None => {
+                    let f = gl.create_framebuffer().expect("create present framebuffer");
+                    self.present_fbo = Some(f);
+                    f
+                }
+            };
+            gl.bind_framebuffer(glow::FRAMEBUFFER, Some(fbo));
+            gl.framebuffer_texture_2d(
+                glow::FRAMEBUFFER,
+                glow::COLOR_ATTACHMENT0,
+                glow::TEXTURE_2D,
+                Some(tex),
+                0,
+            );
+            let status = gl.check_framebuffer_status(glow::FRAMEBUFFER);
+            assert_eq!(
+                status,
+                glow::FRAMEBUFFER_COMPLETE,
+                "present FBO incomplete: status=0x{status:x}"
+            );
+            gl.bind_framebuffer(glow::FRAMEBUFFER, None);
+            self.present_tex = Some(tex);
+            self.present_size = Some((w, h));
+            PRESENT_TEX.store(tex.0.get(), Ordering::Relaxed);
+            PRESENT_W.store(w, Ordering::Relaxed);
+            PRESENT_H.store(h, Ordering::Relaxed);
+        }
     }
 
     fn present(&mut self, pipeline: &LiveTrackerPipeline, screen_w: i32, screen_h: i32) {
@@ -174,8 +268,9 @@ impl RenderState {
         }
 
         // The framebuffer afterRendering has bound is the scene graph's target —
-        // NOT necessarily 0 on Qt's render thread. Save it so the on-screen
-        // present goes back to it (read_camera_rgba binds our FBO in between).
+        // NOT necessarily 0 on Qt's render thread. Save it so we can hand it back
+        // for the buffer swap (read_camera_gray and the composite bind our own
+        // FBOs in between).
         let sg_fbo = unsafe { self.gl.get_parameter_i32(glow::FRAMEBUFFER_BINDING) };
 
         let uv = compute_uv_mat(cam_w as f32, cam_h as f32, fw as f32, fh as f32);
@@ -201,15 +296,15 @@ impl RenderState {
         let frame = std::sync::Arc::new(LiveFrame::new(0));
         frame.reset_gray(gray, fw, fh);
 
-        // Restore the scene-graph framebuffer (read_camera_gray bound our FBO)
-        // and the full-screen viewport so the composite lands on screen.
+        // Composite into the owned present FBO, not the screen: the scene graph
+        // already rendered this pass (the LiveCameraItem node shows the previous
+        // present, the QML controls compose on top of it). read_camera_gray left
+        // its gray FBO bound; point at the present FBO and size the viewport to
+        // the screen so the composite fills it.
+        self.ensure_present_fbo(screen_w as u32, screen_h as u32);
         unsafe {
-            match NonZeroU32::new(sg_fbo as u32) {
-                Some(fbo) => self
-                    .gl
-                    .bind_framebuffer(glow::FRAMEBUFFER, Some(glow::NativeFramebuffer(fbo))),
-                None => self.gl.bind_framebuffer(glow::FRAMEBUFFER, None),
-            }
+            self.gl
+                .bind_framebuffer(glow::FRAMEBUFFER, self.present_fbo);
             self.gl.viewport(0, 0, screen_w, screen_h);
         }
 
@@ -240,6 +335,16 @@ impl RenderState {
                 }
             }
             Err(e) => eprintln!("live GPU process_frame failed: {e:?}"),
+        }
+
+        // Hand the scene-graph target back to Qt for the buffer swap.
+        unsafe {
+            match NonZeroU32::new(sg_fbo as u32) {
+                Some(fbo) => self
+                    .gl
+                    .bind_framebuffer(glow::FRAMEBUFFER, Some(glow::NativeFramebuffer(fbo))),
+                None => self.gl.bind_framebuffer(glow::FRAMEBUFFER, None),
+            }
         }
 
         // Render-thread budget the pipeline's `[lt]` line can't see: `gap` is the
@@ -273,9 +378,10 @@ thread_local! {
     static RT: RefCell<Option<RenderState>> = const { RefCell::new(None) };
 }
 
-/// Composite the live camera + overlays to the screen. Called from the C++
-/// `afterRendering` handler (render thread, GL current) with the framebuffer
-/// size in device pixels.
+/// Composite the live camera + overlays into the owned present FBO. Called from
+/// the C++ `afterRendering` handler (render thread, GL current) with the
+/// framebuffer size in device pixels. The `LiveCameraItem` scene-graph node
+/// samples the FBO texture so the QML controls compose on top of it.
 #[unsafe(no_mangle)]
 pub extern "C" fn live_gpu_present_external(screen_w: i32, screen_h: i32) {
     let Some(pipeline) = live_pipeline() else {
@@ -293,4 +399,32 @@ pub extern "C" fn live_gpu_present_external(screen_w: i32, screen_h: i32) {
             .expect("render state present")
             .present(pipeline, screen_w, screen_h);
     });
+}
+
+/// The present FBO color texture id, writing its size into `out_w`/`out_h`.
+/// Called from the `LiveCameraItem` scene-graph texture node (render thread).
+/// Returns 0 before the first composite has allocated the FBO.
+#[unsafe(no_mangle)]
+pub extern "C" fn live_gpu_present_texture(out_w: *mut i32, out_h: *mut i32) -> u32 {
+    let w = PRESENT_W.load(Ordering::Relaxed);
+    let h = PRESENT_H.load(Ordering::Relaxed);
+    unsafe {
+        if !out_w.is_null() {
+            *out_w = w as i32;
+        }
+        if !out_h.is_null() {
+            *out_h = h as i32;
+        }
+    }
+    PRESENT_TEX.load(Ordering::Relaxed)
+}
+
+/// The present FBO size, or `(0, 0)` before the first composite. Lets the node
+/// skip building geometry (and report a non-zero texture size) before there is
+/// anything to show.
+pub fn present_size() -> (u32, u32) {
+    (
+        PRESENT_W.load(Ordering::Relaxed),
+        PRESENT_H.load(Ordering::Relaxed),
+    )
 }
