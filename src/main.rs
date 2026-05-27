@@ -7,6 +7,8 @@ mod data;
 mod download;
 mod eventloop;
 mod image_ocr;
+mod live_camera_item;
+mod live_gpu;
 mod live_ocr;
 mod model;
 mod pulse;
@@ -136,6 +138,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         0,
         c"RenderedImageItem",
     );
+    qml_register_type::<live_camera_item::LiveCameraItem>(c"TranslatorUi", 1, 0, c"LiveCameraItem");
     unsafe { register_live_ocr_filter() };
 
     let (bus_tx, bus_rx) = mpsc::channel::<IoEvent>();
@@ -164,7 +167,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     engine.set_object_property("app".into(), app.pinned());
 
     let ui_callbacks = create_ui_callbacks(QPointer::from(app.pinned().borrow()));
-    live_ocr::set_live_image_sink(ui_callbacks.set_live_camera_image.clone());
+    live_ocr::set_live_frame_tick(ui_callbacks.notify_live_frame.clone());
     let session_for_loop = Arc::clone(&session);
     let jh = std::thread::spawn(move || {
         eventloop::run_eventloop(bus_rx, ui_callbacks, session_for_loop)
@@ -173,6 +176,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     bus_tx.send(IoEvent::SetAppPaths(app_paths)).unwrap();
     engine.load_file(main_qml.into());
     engine.exec();
+
+    // Tear down the engine (and its live QML bindings) before the "app" context
+    // object it reads from. The reverse order destroys `app` while bindings
+    // still reference it, spewing "property of null" TypeErrors during teardown.
+    drop(engine);
 
     bus_tx.send(IoEvent::Shutdown).unwrap();
     drop(bus_tx);

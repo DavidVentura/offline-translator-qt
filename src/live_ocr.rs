@@ -77,19 +77,8 @@ pub fn run_benchmark(
         frame.reset_owned(rgba.clone(), w, h, 0);
         let started = Instant::now();
         let mut target = translator::live_compositor::SliceTarget { dst: &mut dst[..] };
-        let result = pipeline.process_frame(
-            &frame,
-            crop,
-            &mut target,
-            w,
-            h,
-            w,
-            h,
-            w,
-            h,
-            true,
-            timestamp_ns,
-        );
+        let result =
+            pipeline.process_frame(&frame, crop, &mut target, w, h, w, h, w, h, timestamp_ns);
         let frame_ms = started.elapsed().as_secs_f32() * 1000.0;
         match result {
             Ok(r) => eprintln!(
@@ -127,17 +116,48 @@ struct PendingFrame {
     height: u32,
 }
 
+/// A camera frame already rotated upright, cropped to the viewport aspect and
+/// downscaled — ready to hand to the GPU compositor as both the camera source
+/// and the composite output size.
+pub(crate) struct ReadyFrame {
+    pub rgba: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
+}
+
 struct LiveState {
     pending: Mutex<Option<PendingFrame>>,
     cv: Condvar,
     viewport: Mutex<(u32, u32)>,
+    // Latest transformed frame awaiting GPU present on the render thread.
+    ready: Mutex<Option<ReadyFrame>>,
 }
 
 static LIVE_STATE: OnceLock<Arc<LiveState>> = OnceLock::new();
-static LIVE_IMAGE_SINK: OnceLock<Arc<dyn Fn(qmetaobject::QImage) + Send + Sync>> = OnceLock::new();
+static PIPELINE: OnceLock<Arc<LiveTrackerPipeline>> = OnceLock::new();
+static LIVE_FRAME_TICK: OnceLock<Arc<dyn Fn() + Send + Sync>> = OnceLock::new();
 
-pub fn set_live_image_sink(sink: Arc<dyn Fn(qmetaobject::QImage) + Send + Sync>) {
-    let _ = LIVE_IMAGE_SINK.set(sink);
+/// The render thread calls `process_frame` on this shared pipeline; it's created
+/// in [`init_live_pipeline`] before any frame can arrive.
+pub(crate) fn live_pipeline() -> Option<&'static Arc<LiveTrackerPipeline>> {
+    PIPELINE.get()
+}
+
+/// Move the latest transformed frame out for the render thread to present.
+/// Returns `None` when no new frame has arrived since the last call.
+pub(crate) fn take_ready_frame() -> Option<ReadyFrame> {
+    LIVE_STATE
+        .get()?
+        .ready
+        .lock()
+        .expect("ready poisoned")
+        .take()
+}
+
+/// Called by the worker after staging a frame to ask the live item to repaint.
+/// Carries no pixels — the render thread pulls the frame via [`take_ready_frame`].
+pub fn set_live_frame_tick(tick: Arc<dyn Fn() + Send + Sync>) {
+    let _ = LIVE_FRAME_TICK.set(tick);
 }
 
 pub fn set_live_viewport(width: u32, height: u32) {
@@ -146,28 +166,38 @@ pub fn set_live_viewport(width: u32, height: u32) {
     }
 }
 
+/// Force a fresh acquire on the next frame (the user tapped the preview).
+/// Clears tracker, overlay and session state so the next `process_frame`
+/// re-detects from scratch instead of tracking the stale lock.
+pub fn request_acquire() {
+    if let Some(pipeline) = PIPELINE.get() {
+        pipeline.reset();
+    }
+}
+
 pub fn init_live_pipeline(session: Arc<TranslatorSession>) {
+    let pipeline = LiveTrackerPipeline::new(session, Arc::new(DejaVuFontProvider));
+    pipeline.set_languages("en", "nl", false);
+    let _ = PIPELINE.set(pipeline);
+
     let state = Arc::new(LiveState {
         pending: Mutex::new(None),
         cv: Condvar::new(),
         viewport: Mutex::new((0, 0)),
+        ready: Mutex::new(None),
     });
     let _ = LIVE_STATE.set(Arc::clone(&state));
     std::thread::Builder::new()
         .name("live-ocr".into())
-        .spawn(move || live_worker(session, state))
+        .spawn(move || live_worker(state))
         .expect("failed to spawn live-ocr worker");
 }
 
-// Runs the pipeline off the render thread. Always processes the most recent
-// frame, dropping any that arrived while it was busy — so the render thread
-// never blocks and latency stays bounded to one process_frame.
-fn live_worker(session: Arc<TranslatorSession>, state: Arc<LiveState>) {
-    let pipeline = LiveTrackerPipeline::new(session, Arc::new(DejaVuFontProvider));
-    pipeline.set_languages("en", "nl", false);
-    let frame = Arc::new(LiveFrame::new(0));
-    let start = Instant::now();
-
+// Transforms the most recent camera frame upright off the render thread,
+// dropping any that arrived while it was busy, then stages it and pokes the
+// render thread to present. The heavy tracker + GPU compose runs in
+// `process_frame` on the render thread (see `live_gpu`).
+fn live_worker(state: Arc<LiveState>) {
     loop {
         let pending = {
             let mut guard = state.pending.lock().expect("live pending poisoned");
@@ -178,38 +208,14 @@ fn live_worker(session: Arc<TranslatorSession>, state: Arc<LiveState>) {
         };
 
         let viewport = *state.viewport.lock().expect("viewport poisoned");
-        let (rgba, fw, fh) = transform_frame(&pending, viewport);
-        frame.reset_owned(rgba, fw, fh, 0);
-
-        // Fresh buffer per frame: the compositor writes into it and the QImage
-        // takes ownership (zero-copy), freeing it once the scene graph has
-        // uploaded the texture. Reusing one buffer would race that upload.
-        // Left uninitialized — the composite's camera blit overwrites every byte
-        // before we read it, and we only hand it to the QImage when the composite
-        // reported it filled the whole buffer (composite_bytes == len).
-        let len = (fw * fh * 4) as usize;
-        let mut dst: Vec<u8> = Vec::with_capacity(len);
-        #[allow(clippy::uninit_vec)]
-        unsafe {
-            dst.set_len(len);
-        }
-        let crop = Rect {
-            left: 0,
-            top: 0,
-            right: fw,
-            bottom: fh,
-        };
-        let ts = start.elapsed().as_nanos() as u64;
-        let mut target = translator::live_compositor::SliceTarget { dst: &mut dst[..] };
-        let result =
-            pipeline.process_frame(&frame, crop, &mut target, fw, fh, fw, fh, fw, fh, true, ts);
-        let filled = matches!(&result, Ok(r) if r.composite_bytes as usize == len);
-
-        if filled {
-            if let Some(sink) = LIVE_IMAGE_SINK.get() {
-                let image = crate::rendered_image_item::qimage_from_owned_rgba(fw, fh, dst);
-                sink(image);
-            }
+        let (rgba, width, height) = transform_frame(&pending, viewport);
+        *state.ready.lock().expect("ready poisoned") = Some(ReadyFrame {
+            rgba,
+            width,
+            height,
+        });
+        if let Some(tick) = LIVE_FRAME_TICK.get() {
+            tick();
         }
     }
 }

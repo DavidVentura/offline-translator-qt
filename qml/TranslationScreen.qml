@@ -479,6 +479,7 @@ Item {
                 y: speechButton.y + speechButton.height + ui.dp(8)
                 width: Math.min(ui.dp(220), parent.width - ui.dp(24))
                 height: popupContent.implicitHeight
+                contentWidth: availableWidth
                 modal: false
                 closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
                 padding: 0
@@ -493,7 +494,6 @@ Item {
 
                 contentItem: Item {
                     id: popupContent
-                    implicitWidth: speechOptionsPopup.width
                     implicitHeight: popupColumn.implicitHeight + ui.dp(24)
 
                     Column {

@@ -28,9 +28,9 @@ impl AppBridge {
         }
     }
 
-    pub(crate) fn set_live_camera_image_value(&mut self, image: QImage) {
-        self.live_camera_image = image;
-        self.live_camera_image_changed();
+    pub(crate) fn bump_live_frame_tick(&mut self) {
+        self.live_frame_tick = self.live_frame_tick.wrapping_add(1);
+        self.live_frame_tick_changed();
     }
 
     pub(crate) fn set_share_image_url_value(&mut self, url: String) {

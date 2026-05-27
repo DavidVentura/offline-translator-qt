@@ -30,12 +30,22 @@ Item {
         filters: [ LiveOcrFilter {} ]
     }
 
-    // The composited camera + translation overlay. The worker already rotates
-    // the frame upright and crops it to this viewport's aspect, so it fills
-    // without rotation or letterboxing here.
-    RenderedImageItem {
+    // The composited camera + translation overlay, rendered on the GPU. The
+    // worker rotates the frame upright and crops it to this viewport's aspect,
+    // so it fills without rotation or letterboxing here. `frame_tick` advances
+    // per camera frame to schedule a GPU present.
+    LiveCameraItem {
         anchors.fill: parent
-        image: root.appBridge.live_camera_image
+        frame_tick: root.appBridge.live_frame_tick
+    }
+
+    // Covers the preview so taps trigger a fresh acquire and, crucially, don't
+    // fall through to the TranslationScreen beneath this overlay (which would
+    // focus a TextField and raise the keyboard). The close button is a later
+    // sibling, so it stacks above this and still receives its own taps.
+    MouseArea {
+        anchors.fill: parent
+        onClicked: root.appBridge.request_live_acquire()
     }
 
     RoundButton {

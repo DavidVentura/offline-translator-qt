@@ -54,8 +54,10 @@ pub struct AppBridge {
     pub live_camera_open: qt_property!(bool; NOTIFY live_camera_open_changed),
     pub live_camera_open_changed: qt_signal!(),
 
-    pub live_camera_image: qt_property!(QImage; NOTIFY live_camera_image_changed),
-    pub live_camera_image_changed: qt_signal!(),
+    // Per-frame counter; LiveCameraItem binds `frameTick` to it so each new
+    // camera frame schedules a GPU present. Carries no pixels.
+    pub live_frame_tick: qt_property!(i32; NOTIFY live_frame_tick_changed),
+    pub live_frame_tick_changed: qt_signal!(),
 
     pub tts_available: qt_property!(bool; NOTIFY tts_available_changed),
     pub tts_available_changed: qt_signal!(),
@@ -408,6 +410,11 @@ pub struct AppBridge {
     pub set_live_viewport: qt_method!(
         fn set_live_viewport(&self, width: i32, height: i32) {
             crate::live_ocr::set_live_viewport(width.max(0) as u32, height.max(0) as u32);
+        }
+    ),
+    pub request_live_acquire: qt_method!(
+        fn request_live_acquire(&self) {
+            crate::live_ocr::request_acquire();
         }
     ),
     pub process_image_selection: qt_method!(

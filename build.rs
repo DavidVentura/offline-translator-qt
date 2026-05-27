@@ -30,6 +30,7 @@ fn main() {
     }
 
     println!("cargo:rerun-if-changed=src/rendered_image_item.rs");
+    println!("cargo:rerun-if-changed=src/live_camera_item.rs");
 
     let qt_include_path =
         std::env::var("DEP_QT_INCLUDE_PATH").expect("DEP_QT_INCLUDE_PATH missing");
@@ -39,9 +40,9 @@ fn main() {
             config.flag(flag);
         }
     }
-    config
-        .include(&qt_include_path)
-        .build("src/rendered_image_item.rs");
+    // Build from the crate root so cpp! blocks in every module (e.g.
+    // rendered_image_item.rs and live_camera_item.rs) are compiled.
+    config.include(&qt_include_path).build("src/main.rs");
 
     build_live_filter(&qt_include_path);
 }

@@ -18,11 +18,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 env_logger = "0.11"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+# Must match translator's glow so GlesRenderer and our FBO share one type/context.
+glow = { version = "0.17", default-features = false }
 
 [dependencies.translator]
 # git = "https://github.com/DavidVentura/translator-rs.git"
 path = "/home/david/git/translator-rs"
-features = ["tesseract", "tts", "transliterate", "mucab", "dictionary", "ppocr", "planar-tracker"]
+features = ["tesseract", "tts", "transliterate", "mucab", "dictionary", "ppocr", "planar-tracker", "gpu"]
 
 [profile.dev]
 #debug = false
