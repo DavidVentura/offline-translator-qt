@@ -185,23 +185,23 @@ impl RenderState {
         // the OCR sees is exactly what's displayed (no divergent orientation).
         let dx = display_xform(fw as f32, fh as f32);
 
-        // Canonical RGBA → the LiveFrame the tracker + det/rec consume. The
-        // glReadPixels here is a synchronous GPU→CPU stall, billed outside the
-        // pipeline's `[lt]` total, so it's timed separately below.
+        // Per-frame: a one-channel luma readback feeds the tracker (no RGBA
+        // transfer, no CPU RGBA→luma). The expensive full-res RGBA readback only
+        // happens on acquire/refresh, below. The glReadPixels stall is billed
+        // outside the pipeline's `[lt]` total, so it's timed separately.
         let t_read = Instant::now();
-        let Some(rgba) = self.gles.read_camera_rgba(fw, fh, &dx) else {
+        let Some(gray) = self.gles.read_camera_gray(fw, fh, &dx) else {
             return;
         };
         let readback_ms = t_read.elapsed().as_secs_f32() * 1000.0;
         // Fresh frame per present, never reused. An in-flight acquire holds its
         // frame's state lock for the whole det+rec (~1s); reusing one frame would
-        // make this `reset_owned` block on that lock and freeze the render thread
-        // for the entire acquire. A new Arc each frame keeps them independent
-        // (the acquire's clone keeps its frame alive on the worker).
+        // make this `reset_*` block on that lock and freeze the render thread for
+        // the entire acquire. A new Arc each frame keeps them independent.
         let frame = std::sync::Arc::new(LiveFrame::new(0));
-        frame.reset_owned(rgba, fw, fh, 0);
+        frame.reset_gray(gray, fw, fh);
 
-        // Restore the scene-graph framebuffer (read_camera_rgba bound our FBO)
+        // Restore the scene-graph framebuffer (read_camera_gray bound our FBO)
         // and the full-screen viewport so the composite lands on screen.
         unsafe {
             match NonZeroU32::new(sg_fbo as u32) {
@@ -220,16 +220,26 @@ impl RenderState {
             bottom: fh,
         };
         let ts = self.start.elapsed().as_nanos() as u64;
-        {
+        let result = {
             let mut target = ExternalPresentTarget {
                 renderer: &mut self.gles,
                 display_xform: dx,
             };
-            if let Err(e) =
-                pipeline.process_frame(&frame, crop, &mut target, fw, fh, fw, fh, fw, fh, ts)
-            {
-                eprintln!("live GPU process_frame failed: {e:?}");
+            pipeline.process_frame(&frame, crop, &mut target, fw, fh, fw, fh, fw, fh, ts)
+        };
+        match result {
+            // The tracker wants to acquire/refresh but the gray frame has no
+            // RGBA. Read back the full-res RGBA once and hand it to the worker.
+            Ok(r) => {
+                if let Some(req) = r.rgb_request {
+                    if let Some(rgba) = self.gles.read_camera_rgba(fw, fh, &dx) {
+                        let rgb_frame = std::sync::Arc::new(LiveFrame::new(0));
+                        rgb_frame.reset_owned(rgba, fw, fh, 0);
+                        pipeline.provide_acquire_rgb(req, &rgb_frame);
+                    }
+                }
             }
+            Err(e) => eprintln!("live GPU process_frame failed: {e:?}"),
         }
 
         // Render-thread budget the pipeline's `[lt]` line can't see: `gap` is the
