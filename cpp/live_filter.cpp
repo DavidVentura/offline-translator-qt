@@ -5,17 +5,13 @@
 #include <QtQml/qqml.h>
 #include <QtCore/QByteArray>
 #include <QtCore/QDebug>
-#include <QtCore/QElapsedTimer>
 #include <QtCore/QThread>
 
-#include <cstring>
-
-// Defined in Rust (src/live_ocr.rs). Reads a Format_RGB32 (BGRX) frame, runs
-// the pipeline, and pushes the composited result to the UI itself.
-extern "C" void live_ocr_process_frame(const unsigned char *in_ptr,
-                                       int stride,
-                                       int width,
-                                       int height);
+// Defined in Rust (src/live_gpu.rs). Hands the camera frame's external-OES
+// texture id (+ sensor dims) to the afterRendering composite for zero-copy
+// display, and drives a repaint. This is now the filter's *only* job — no
+// map/copy; the whole frame stays on the GPU.
+extern "C" void live_gpu_set_camera_texture(unsigned int id, unsigned int w, unsigned int h);
 
 class LiveOcrRunnable : public QVideoFilterRunnable {
 public:
@@ -26,56 +22,39 @@ public:
             return input ? *input : QVideoFrame();
         }
 
-        QElapsedTimer t;
-        t.start();
-        if (!input->map(QAbstractVideoBuffer::ReadOnly)) {
-            warnOnce("LiveOcrFilter: map(ReadOnly) failed (GPU-only frame?)");
-            return *input;
+        // One-time probe: does the camera hand us a GL texture (handleType==1,
+        // GLTextureHandle) or a CPU buffer that must be mapped (handleType==0,
+        // NoHandle)? This decides whether zero-readback GPU compositing is on
+        // the table. pixelFormat: see QVideoFrame::PixelFormat enum.
+        if (!m_logged) {
+            m_logged = true;
+            qInfo("[livefilter] PROBE handleType=%d pixelFormat=%d size=%dx%d planes=%d thread=%p",
+                  static_cast<int>(input->handleType()),
+                  static_cast<int>(input->pixelFormat()),
+                  input->width(), input->height(), input->planeCount(),
+                  static_cast<void *>(QThread::currentThread()));
         }
-        const double mapMs = t.nsecsElapsed() / 1e6;
+        // The camera frame's handle() is the GL_TEXTURE_EXTERNAL_OES id, but it
+        // starts at 0 until qtvideo-node mints the texture on the first rendered
+        // frame (qtubuntu-camera onTextureCreated). Log on every *change* so we
+        // see the 0 -> real-id transition; nonzero means we can sample it
+        // directly (zero-copy).
+        {
+            unsigned int hdl = input->handle().toUInt();
+            if (hdl != m_lastHandle) {
+                m_lastHandle = hdl;
+                qInfo("[livefilter] PROBE handle id now=%u", hdl);
+            }
+            live_gpu_set_camera_texture(hdl, static_cast<unsigned int>(input->width()),
+                                        static_cast<unsigned int>(input->height()));
+        }
 
-        const int w = input->width();
-        const int h = input->height();
-        const int stride = input->bytesPerLine();
-        const unsigned char *bits = input->bits();
-        double copyMs = 0.0;
-        if (bits && w > 0 && h > 0) {
-            QElapsedTimer t2;
-            t2.start();
-            live_ocr_process_frame(bits, stride, w, h);
-            copyMs = t2.nsecsElapsed() / 1e6;
-        } else {
-            warnOnce("LiveOcrFilter: mapped but bits() null");
-        }
-        input->unmap();
-
-        // Attribution: is this on the SG render thread, and how much does the
-        // camera-buffer map (potential GPU->CPU readback) + the frame copy cost?
-        m_mapSum += mapMs;
-        m_copySum += copyMs;
-        if (++m_frames >= 30) {
-            qInfo("[livefilter] thread=%p %d frames map=%.2fms copy=%.2fms",
-                  (void *)QThread::currentThread(), m_frames,
-                  m_mapSum / m_frames, m_copySum / m_frames);
-            m_frames = 0;
-            m_mapSum = 0.0;
-            m_copySum = 0.0;
-        }
         return *input;
     }
 
 private:
-    void warnOnce(const char *msg) {
-        if (!m_warned) {
-            m_warned = true;
-            qWarning("%s", msg);
-        }
-    }
-
-    bool m_warned = false;
-    int m_frames = 0;
-    double m_mapSum = 0.0;
-    double m_copySum = 0.0;
+    bool m_logged = false;
+    unsigned int m_lastHandle = 0xFFFFFFFFu;
 };
 
 QVideoFilterRunnable *LiveOcrFilter::createFilterRunnable() {

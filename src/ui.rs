@@ -54,6 +54,11 @@ pub struct AppBridge {
     pub live_camera_open: qt_property!(bool; NOTIFY live_camera_open_changed),
     pub live_camera_open_changed: qt_signal!(),
 
+    // Whether the live pipeline detects/translates. When false the live screen
+    // is a plain viewfinder for snapping a still into the image OCR pipeline.
+    pub live_ocr_active: qt_property!(bool; NOTIFY live_ocr_active_changed),
+    pub live_ocr_active_changed: qt_signal!(),
+
     // Per-frame counter; LiveCameraItem binds `frameTick` to it so each new
     // camera frame schedules a GPU present. Carries no pixels.
     pub live_frame_tick: qt_property!(i32; NOTIFY live_frame_tick_changed),
@@ -399,6 +404,27 @@ pub struct AppBridge {
         fn open_live_camera(&mut self) {
             self.live_camera_open = true;
             self.live_camera_open_changed();
+            crate::live_ocr::set_live_languages(
+                &self.source_language_code,
+                &self.target_language_code,
+            );
+            crate::live_ocr::set_live_active(self.live_ocr_active);
+        }
+    ),
+    pub set_live_ocr_active: qt_method!(
+        fn set_live_ocr_active(&mut self, value: bool) {
+            if self.live_ocr_active != value {
+                self.live_ocr_active = value;
+                self.live_ocr_active_changed();
+            }
+            crate::live_ocr::set_live_active(value);
+        }
+    ),
+    pub capture_dir: qt_method!(
+        fn capture_dir(&self) -> QString {
+            let dir = std::path::Path::new(&self.data_dir).join("live_captures");
+            let _ = std::fs::create_dir_all(&dir);
+            QString::from(dir.display().to_string())
         }
     ),
     pub close_live_camera: qt_method!(

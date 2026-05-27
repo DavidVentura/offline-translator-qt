@@ -25,9 +25,10 @@ cpp! {{
     #include <QtQuick/QSGSimpleTextureNode>
     #include <QtQuick/QSGTexture>
     #include <QtCore/QByteArray>
+    #include <QtCore/QThread>
+    #include <QtCore/QDebug>
 
-    extern "C" void live_gpu_before_rendering();
-    extern "C" bool live_gpu_color_tex(unsigned *id, unsigned *w, unsigned *h);
+    extern "C" void live_gpu_present_external(int vw, int vh);
 
     // Resolve GL procs for the Rust-side glow loaders. Render thread only.
     extern "C" const void *live_gl_get_proc(const char *name) {
@@ -72,7 +73,7 @@ impl LiveCameraItem {
         (self as &dyn QQuickItem).update();
     }
 
-    fn connect_before_rendering(&mut self) {
+    fn connect_present(&mut self) {
         if self.connected {
             return;
         }
@@ -85,8 +86,18 @@ impl LiveCameraItem {
             if (!win) {
                 return false;
             }
-            QObject::connect(win, &QQuickWindow::beforeRendering, win, []() {
-                live_gpu_before_rendering();
+            // Composite the camera + overlays to the screen in afterRendering —
+            // after qtvideo-node has latched the freshest frame into the external
+            // texture (beforeRendering would sample the previous pass's frame).
+            QObject::connect(win, &QQuickWindow::afterRendering, win, [win]() {
+                static bool logged = false;
+                if (!logged) {
+                    logged = true;
+                    qInfo("[live_gpu] present thread=%p", static_cast<void *>(QThread::currentThread()));
+                }
+                const qreal dpr = win->effectiveDevicePixelRatio();
+                live_gpu_present_external(static_cast<int>(win->width() * dpr),
+                                          static_cast<int>(win->height() * dpr));
             }, Qt::DirectConnection);
             return true;
         });
@@ -106,43 +117,16 @@ impl QQuickItem for LiveCameraItem {
     }
 
     fn update_paint_node(&mut self, node: SGNode<ContainerNode>) -> SGNode<ContainerNode> {
-        self.connect_before_rendering();
-
+        // Ensure the afterRendering composite is connected; frame_tick →
+        // update() schedules the passes. The item draws no QSG content itself —
+        // live_gpu_present_external composites camera + overlays straight to the
+        // screen in afterRendering.
+        self.connect_present();
         let raw = node.into_raw();
-        let mut id: u32 = 0;
-        let mut w: u32 = 0;
-        let mut h: u32 = 0;
-        let ready = crate::live_gpu::live_gpu_color_tex(&mut id, &mut w, &mut h);
-        if !ready || w == 0 || h == 0 {
-            let cleared = cpp!(unsafe [raw as "QSGNode*"] -> *mut std::os::raw::c_void as "QSGNode*" {
-                delete raw;
-                return nullptr;
-            });
-            return unsafe { SGNode::<ContainerNode>::from_raw(cleared) };
-        }
-
-        // The worker already crops to the viewport aspect, so fill bounds.
-        let target = (self as &dyn QQuickItem).bounding_rect();
-        let new_raw = cpp!(unsafe [
-            raw as "QSGNode*",
-            id as "unsigned",
-            w as "unsigned",
-            h as "unsigned",
-            target as "QRectF"
-        ] -> *mut std::os::raw::c_void as "QSGNode*" {
-            QSGSimpleTextureNode *n = static_cast<QSGSimpleTextureNode *>(raw);
-            if (!n) {
-                n = new QSGSimpleTextureNode();
-                n->setOwnsTexture(true);
-                n->setFiltering(QSGTexture::Linear);
-                n->setTexture(new LiveExternalTexture());
-            }
-            LiveExternalTexture *tex = static_cast<LiveExternalTexture *>(n->texture());
-            tex->set(id, QSize(static_cast<int>(w), static_cast<int>(h)));
-            n->setRect(target);
-            n->markDirty(QSGNode::DirtyMaterial);
-            return n;
+        let cleared = cpp!(unsafe [raw as "QSGNode*"] -> *mut std::os::raw::c_void as "QSGNode*" {
+            delete raw;
+            return nullptr;
         });
-        unsafe { SGNode::<ContainerNode>::from_raw(new_raw) }
+        unsafe { SGNode::<ContainerNode>::from_raw(cleared) }
     }
 }

@@ -58,6 +58,7 @@ impl AppBridge {
         app.target_language_code = "en".to_string();
         app.source_language_name = QString::from("English");
         app.target_language_name = QString::from("English");
+        app.live_ocr_active = true;
 
         app.disable_auto_detect = settings.disable_auto_detect;
         app.ocr_background_mode = QString::from(settings.ocr_background_mode);

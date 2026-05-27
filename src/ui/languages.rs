@@ -79,10 +79,19 @@ impl AppBridge {
                 self.source_language_name = qname;
                 self.source_language_name_changed();
             }
+            crate::live_ocr::set_live_languages(
+                &self.source_language_code,
+                &self.target_language_code,
+            );
             self.stop_tts();
             self.refresh_swap_enabled();
             self.refresh_detected_language();
-            self.refresh_translation_content();
+            // While the live camera is open the text/image view is hidden;
+            // re-running its (heavy) OCR/translation on every pill change is
+            // wasted work — the live pipeline is retargeted above instead.
+            if !self.live_camera_open {
+                self.refresh_translation_content();
+            }
             self.refresh_input_transliteration();
             self.persist_settings();
         }
@@ -101,9 +110,15 @@ impl AppBridge {
                 self.target_language_name = qname;
                 self.target_language_name_changed();
             }
+            crate::live_ocr::set_live_languages(
+                &self.source_language_code,
+                &self.target_language_code,
+            );
             self.stop_tts();
             self.refresh_swap_enabled();
-            self.refresh_translation_content();
+            if !self.live_camera_open {
+                self.refresh_translation_content();
+            }
             self.tts_prewarmed_language_code.clear();
             self.refresh_tts_availability();
             self.reset_tts_voice_selection_state();

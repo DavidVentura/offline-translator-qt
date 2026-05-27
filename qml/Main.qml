@@ -113,6 +113,7 @@ ApplicationWindow {
             id: liveCameraComponent
             LiveCameraScreen {
                 appBridge: app
+                theme: theme
             }
         }
 
