@@ -16,6 +16,11 @@ Item {
     // re-entry until the image is saved (or fails).
     property bool capturing: false
 
+    // True when the live-camera screen is visible/in use. When false we
+    // park the QCamera in UnloadedState so it doesn't sit on the HAL,
+    // but the element itself stays alive — see the comment in Main.qml.
+    property bool screenActive: false
+
     property bool torchOn: false
     // The flash mode that means "continuous light" on this device, picked from
     // what the backend actually advertises (some report FlashTorch, some
@@ -69,6 +74,9 @@ Item {
     Camera {
         id: cam
         captureMode: Camera.CaptureStillImage
+        // Park the camera when the screen isn't visible (same pattern as
+        // lomiri-camera-app: never destroy the Camera, just toggle state).
+        cameraState: root.screenActive ? Camera.ActiveState : Camera.UnloadedState
         focus.focusMode: Camera.FocusContinuous
         focus.focusPointMode: Camera.FocusPointAuto
         flash.mode: root.torchOn ? root.torchOnValue : Camera.FlashOff
@@ -84,9 +92,7 @@ Item {
             onImageSaved: {
                 root.capturing = false
                 appBridge.process_image_selection(path)
-                // Defer the close: it deactivates this Loader and destroys the
-                // Camera whose signal we're inside, which is unsafe to do inline.
-                Qt.callLater(appBridge.close_live_camera)
+                appBridge.close_live_camera()
             }
             onCaptureFailed: {
                 root.capturing = false
@@ -130,6 +136,7 @@ Item {
     LiveCameraItem {
         anchors.fill: parent
         frame_tick: root.appBridge.live_frame_tick
+        screen_active: root.screenActive
     }
 
     // Covers the preview so a tap re-triggers OCR (when the live pipeline is on)
@@ -259,11 +266,7 @@ Item {
         anchors.margins: ui.dp(12)
         width: ui.dp(40)
         height: ui.dp(40)
-        // Defer: closing deactivates the Loader and tears down the Camera,
-        // whose QCamera::statusChanged then fires into receivers that may
-        // already be partially destroyed if we run it inline from the click
-        // event. Same pattern as imageCapture.onImageSaved above.
-        onClicked: Qt.callLater(root.appBridge.close_live_camera)
+        onClicked: appBridge.close_live_camera()
     }
 
     // Bottom controls: torch (left), shutter (centre), live-OCR toggle (right).

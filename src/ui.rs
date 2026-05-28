@@ -430,6 +430,9 @@ pub struct AppBridge {
         fn close_live_camera(&mut self) {
             self.live_camera_open = false;
             self.live_camera_open_changed();
+            // Park the pipeline so the residual tracker/OCR state doesn't
+            // chew on the last frame in the background.
+            crate::live_ocr::set_live_active(false);
         }
     ),
     pub set_live_viewport: qt_method!(

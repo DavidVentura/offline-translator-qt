@@ -134,20 +134,20 @@ ApplicationWindow {
         }
         } // rotateRoot
 
-        Loader {
-            id: liveCameraLoader
+        // Permanent (not Loader-mounted) on purpose: destroying the Camera
+        // element triggers qtubuntu-camera's plugin to emit a final
+        // QCameraControl::statusChanged from inside ~QCamera into a connection
+        // list that includes a freed receiver, segfaulting in QQmlData::
+        // isSignalConnected. Keeping the QCamera alive for the app's lifetime
+        // and toggling cameraState avoids the destructor path entirely.
+        LiveCameraScreen {
+            id: liveCameraScreen
             anchors.fill: parent
             z: 100
-            active: app.live_camera_open
-            sourceComponent: active ? liveCameraComponent : null
-        }
-
-        Component {
-            id: liveCameraComponent
-            LiveCameraScreen {
-                appBridge: app
-                theme: theme
-            }
+            visible: app.live_camera_open
+            screenActive: app.live_camera_open
+            appBridge: app
+            theme: theme
         }
 
         Timer {

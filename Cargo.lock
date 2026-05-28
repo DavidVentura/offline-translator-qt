@@ -540,6 +540,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dlib"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab8ecd87370524b461f8557c119c405552c396ed91fc0a8eec68679eab26f94a"
+dependencies = [
+ "libloading 0.8.9",
+]
+
+[[package]]
 name = "either"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -645,6 +654,15 @@ checksum = "843fba2746e448b37e26a819579957415c8cef339bf08564fe8b7ddbd959573c"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
+]
+
+[[package]]
+name = "fontconfig"
+version = "0.11.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6361835aeab270cb29980fa642ba323e0f6457c9a738a13e3b6c8fbe9ed79ee7"
+dependencies = [
+ "yeslogic-fontconfig-sys",
 ]
 
 [[package]]
@@ -1324,6 +1342,16 @@ dependencies = [
 [[package]]
 name = "mnn-sys"
 version = "0.1.0"
+dependencies = [
+ "bindgen 0.69.5",
+ "cc",
+ "cmake",
+ "ndarray 0.16.1",
+]
+
+[[package]]
+name = "mnn-sys"
+version = "0.1.0"
 source = "git+https://github.com/DavidVentura/mnn-sys#f9643f744dead887665b9ad498aa82b2c8316455"
 dependencies = [
  "bindgen 0.69.5",
@@ -1512,8 +1540,10 @@ dependencies = [
  "cpp_build",
  "env_logger",
  "flate2",
+ "fontconfig",
  "glow",
  "image",
+ "mnn-sys 0.1.0",
  "qmetaobject",
  "qttypes",
  "rayon",
@@ -1658,7 +1688,7 @@ source = "git+https://github.com/DavidVentura/piper-rs#7776f7bae83b82a3add2e2d64
 dependencies = [
  "espeak-rs",
  "log",
- "mnn-sys",
+ "mnn-sys 0.1.0 (git+https://github.com/DavidVentura/mnn-sys)",
  "mucab",
  "ndarray 0.16.1",
  "ndarray-npy",
@@ -2481,7 +2511,7 @@ dependencies = [
  "image",
  "imageproc",
  "log",
- "mnn-sys",
+ "mnn-sys 0.1.0 (git+https://github.com/DavidVentura/mnn-sys)",
  "mucab",
  "ndarray 0.16.1",
  "piper-rs",
@@ -2891,6 +2921,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "388c44dc09d76f1536602ead6d325eb532f5c122f17782bd57fb47baeeb767e2"
 dependencies = [
  "lzma-sys",
+]
+
+[[package]]
+name = "yeslogic-fontconfig-sys"
+version = "6.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d8b8abf912b9a29ff112e1671c97c33636903d13a69712037190e6805af4f76"
+dependencies = [
+ "dlib",
+ "once_cell",
+ "pkg-config",
 ]
 
 [[package]]

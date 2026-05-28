@@ -18,7 +18,7 @@
 use std::cell::RefCell;
 use std::ffi::{CString, c_char, c_void};
 use std::num::NonZeroU32;
-use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
 use std::time::Instant;
 
 use glow::HasContext;
@@ -70,6 +70,15 @@ static CAMERA_H: AtomicU32 = AtomicU32::new(0);
 static PRESENT_TEX: AtomicU32 = AtomicU32::new(0);
 static PRESENT_W: AtomicU32 = AtomicU32::new(0);
 static PRESENT_H: AtomicU32 = AtomicU32::new(0);
+
+// Set to true while the LiveCameraScreen is visible. The afterRendering hook
+// fires on every QQuickWindow render (including UI-only renders when the live
+// screen isn't shown), so we early-out unless the live view is up.
+static PRESENT_ENABLED: AtomicBool = AtomicBool::new(false);
+
+pub fn set_present_enabled(enabled: bool) {
+    PRESENT_ENABLED.store(enabled, Ordering::Relaxed);
+}
 
 /// Called from the video filter each frame: the camera frame's external-OES
 /// texture id (0 until qtvideo-node mints it) + sensor dims.
@@ -360,6 +369,9 @@ thread_local! {
 /// samples the FBO texture so the QML controls compose on top of it.
 #[unsafe(no_mangle)]
 pub extern "C" fn live_gpu_present_external(screen_w: i32, screen_h: i32) {
+    if !PRESENT_ENABLED.load(Ordering::Relaxed) {
+        return;
+    }
     let Some(pipeline) = live_pipeline() else {
         return;
     };

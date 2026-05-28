@@ -81,6 +81,10 @@ pub struct LiveCameraItem {
     base: qt_base_class!(trait QQuickItem),
     /// Bound in QML to a per-frame counter; each write schedules a repaint.
     frame_tick: qt_property!(i32; WRITE set_frame_tick),
+    /// Bound in QML to `LiveCameraScreen.screenActive`. Gates the GPU
+    /// composite in `live_gpu::live_gpu_present_external` so the afterRendering
+    /// hook doesn't burn cycles when the screen is hidden.
+    screen_active: qt_property!(bool; WRITE set_screen_active),
     connected: bool,
 }
 
@@ -88,6 +92,11 @@ impl LiveCameraItem {
     fn set_frame_tick(&mut self, tick: i32) {
         self.frame_tick = tick;
         (self as &dyn QQuickItem).update();
+    }
+
+    fn set_screen_active(&mut self, active: bool) {
+        self.screen_active = active;
+        crate::live_gpu::set_present_enabled(active);
     }
 
     fn connect_present(&mut self) {
