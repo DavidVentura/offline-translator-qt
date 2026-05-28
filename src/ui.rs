@@ -438,6 +438,11 @@ pub struct AppBridge {
             crate::live_ocr::set_live_viewport(width.max(0) as u32, height.max(0) as u32);
         }
     ),
+    pub set_camera_orientation: qt_method!(
+        fn set_camera_orientation(&self, degrees: i32) {
+            crate::live_gpu::set_camera_orientation_degrees(degrees);
+        }
+    ),
     pub request_live_acquire: qt_method!(
         fn request_live_acquire(&self) {
             crate::live_ocr::request_acquire();

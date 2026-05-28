@@ -18,7 +18,7 @@
 use std::cell::RefCell;
 use std::ffi::{CString, c_char, c_void};
 use std::num::NonZeroU32;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 use std::time::Instant;
 
 use glow::HasContext;
@@ -40,9 +40,17 @@ fn load_proc(name: &str) -> *const c_void {
     unsafe { live_gl_get_proc(c.as_ptr()) }
 }
 
-// Canonical-frame orientation, tuned on-device (same knobs as the validated
-// passthrough): the landscape sensor shown upright on a portrait screen.
-const ROT_QUADRANT: i32 = 1; // 0/1/2/3 => 0/90/180/270 CW
+// Canonical-frame orientation. Stored as a CW quadrant (0/1/2/3 = 0/90/180/270)
+// so the render thread reads it as a single relaxed atomic. Default 1 = 90°,
+// matching the previous hardcoded "landscape sensor on portrait screen" value;
+// QML calls `set_camera_orientation_degrees(cam.orientation)` once the HAL
+// reports the sensor mount angle so devices with a non-90° mount work too.
+static ROT_QUADRANT: AtomicI32 = AtomicI32::new(1);
+
+pub fn set_camera_orientation_degrees(degrees: i32) {
+    let q = (((degrees % 360) + 360) % 360) / 90;
+    ROT_QUADRANT.store(q, Ordering::Relaxed);
+}
 // f,t top-to-bottom bad
 // f,f top-to-bottom bad
 const FLIP_U: bool = true;
@@ -94,7 +102,7 @@ fn canonical_dims(screen_w: u32, screen_h: u32) -> (u32, u32) {
 /// rotating the sensor upright (`ROT_QUADRANT`) and aspect-fill covering the
 /// output. `GlesRenderer` transposes it for GL.
 fn compute_uv_mat(cam_w: f32, cam_h: f32, fw: f32, fh: f32) -> [f32; 9] {
-    let q = ROT_QUADRANT.rem_euclid(4);
+    let q = ROT_QUADRANT.load(Ordering::Relaxed).rem_euclid(4);
     let odd = q == 1 || q == 3;
     let displayed_aspect = if odd { cam_h / cam_w } else { cam_w / cam_h };
     let out_aspect = fw / fh;

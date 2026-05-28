@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Window 2.15
+import QtSensors 5.15
 
 ApplicationWindow {
     id: root
@@ -20,6 +21,27 @@ ApplicationWindow {
         anchors.fill: parent
         property bool automationPending: app.automation_enabled
         property string lastAutomationOutput: ""
+
+        // Device orientation in 0/90/180/270, applied as a CW rotation to the
+        // main UI so the user can hold the phone in any orientation. The live
+        // camera Loader stays outside this rotation — its OpenGL pipeline is
+        // tuned for a portrait window and we leave it that way.
+        readonly property int uiRotation: {
+            if (!orientSensor.reading)
+                return 0
+            switch (orientSensor.reading.orientation) {
+            case OrientationReading.TopUp:    return 0
+            case OrientationReading.LeftUp:   return 90
+            case OrientationReading.TopDown:  return 180
+            case OrientationReading.RightUp:  return 270
+            default:                          return 0
+            }
+        }
+
+        OrientationSensor {
+            id: orientSensor
+            active: true
+        }
 
         function maybeStartAutomation() {
             app.automation_log("start pending=" + automationPending + " from=" + app.automation_from + " to=" + app.automation_to + " text_len=" + app.automation_text.length)
@@ -53,6 +75,16 @@ ApplicationWindow {
             app.automation_log("scheduling screenshot path=" + app.automation_screenshot_path)
             automationScreenshotTimer.restart()
         }
+
+        Item {
+            id: rotateRoot
+            anchors.centerIn: parent
+            width: (appChrome.uiRotation === 90 || appChrome.uiRotation === 270) ? parent.height : parent.width
+            height: (appChrome.uiRotation === 90 || appChrome.uiRotation === 270) ? parent.width : parent.height
+            rotation: appChrome.uiRotation
+            Behavior on rotation {
+                RotationAnimator { duration: 220; easing.type: Easing.OutCubic; direction: RotationAnimator.Shortest }
+            }
 
         Column {
             anchors.fill: parent
@@ -100,6 +132,7 @@ ApplicationWindow {
                 }
             }
         }
+        } // rotateRoot
 
         Loader {
             id: liveCameraLoader

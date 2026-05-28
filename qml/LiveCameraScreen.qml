@@ -2,6 +2,7 @@ import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 import QtMultimedia 5.15
+import Qt.labs.settings 1.0
 import TranslatorUi 1.0
 
 Item {
@@ -29,9 +30,35 @@ Item {
     }
     readonly property bool hasTorch: torchOnValue !== Camera.FlashOff
 
+    // The shutter "click" sound is played by qtubuntu-camera's
+    // AalImageCaptureControl::shutter() (not by QtMultimedia or this app), which
+    // reads QSettings.value("playShutterSound", true) on every capture. Because
+    // the plugin lives in our process, writing this key from our own QSettings
+    // mutes it — same trick lomiri-camera-app uses for its UI toggle.
+    Settings {
+        id: cameraSettings
+        property bool playShutterSound: true
+        Component.onCompleted: playShutterSound = false
+    }
+
     function syncCombo(combo, value) {
         var index = combo.find(value)
         combo.currentIndex = index >= 0 ? index : 0
+    }
+
+    // Kick a one-shot autofocus at a normalized source-frame point. Returns
+    // true if the HAL was actually asked to refocus. Shared between the tap
+    // handler and the auto-fire on camera start.
+    function focusAt(normPoint) {
+        if (!cam.focus.isFocusPointModeSupported(Camera.FocusPointCustom))
+            return false
+        if (normPoint.x < 0.0 || normPoint.x > 1.0 || normPoint.y < 0.0 || normPoint.y > 1.0)
+            return false
+        cam.focus.focusMode = Camera.FocusAuto
+        cam.focus.customFocusPoint = normPoint
+        cam.focus.focusPointMode = Camera.FocusPointCustom
+        autoFocusRevertTimer.restart()
+        return true
     }
 
     Rectangle {
@@ -42,10 +69,16 @@ Item {
     Camera {
         id: cam
         captureMode: Camera.CaptureStillImage
-        viewfinder.resolution: Qt.size(1280, 720)
         focus.focusMode: Camera.FocusContinuous
         focus.focusPointMode: Camera.FocusPointAuto
         flash.mode: root.torchOn ? root.torchOnValue : Camera.FlashOff
+
+        // Just log the HAL-reported sensor mount angle for now — the bridge
+        // is wired (appBridge.set_camera_orientation) but pushing the value
+        // produces a vertical-mirror on at least one device, so we leave the
+        // compositor on its hardcoded default until the reported value can be
+        // mapped to our quadrant/flip convention correctly.
+        onOrientationChanged: console.warn("[cam] sensor orientation reported by HAL: " + cam.orientation)
 
         imageCapture {
             onImageSaved: {
@@ -60,39 +93,9 @@ Item {
             }
         }
 
-        // The 1280x720 request above is silently ignored on this backend (the
-        // sensor handed back 1920x1440 = ~11MB/frame, which the filter reads
-        // back + copies every frame). Once loaded, pick the smallest *supported*
-        // resolution with width >= 960 (so recognizer strips stay legible) to
-        // shrink the per-frame readback proportionally.
         onCameraStatusChanged: {
-            if (cameraStatus !== Camera.LoadedStatus)
-                return
-            if (typeof cam.supportedViewfinderResolutions !== "function")
-                return
-            var res = cam.supportedViewfinderResolutions()
-            var names = []
-            for (var i = 0; i < res.length; i++)
-                names.push(res[i].width + "x" + res[i].height)
-            console.warn("[cam] supported viewfinder: " + names.join(", "))
-            var best = null
-            for (var j = 0; j < res.length; j++) {
-                var r = res[j]
-                if (r.width < 960)
-                    continue
-                if (best === null || r.width * r.height < best.width * best.height)
-                    best = r
-            }
-            if (best === null)
-                for (var k = 0; k < res.length; k++) {
-                    var r2 = res[k]
-                    if (best === null || r2.width * r2.height < best.width * best.height)
-                        best = r2
-                }
-            if (best !== null) {
-                cam.viewfinder.resolution = Qt.size(best.width, best.height)
-                console.warn("[cam] set viewfinder " + best.width + "x" + best.height)
-            }
+            if (cameraStatus === Camera.ActiveStatus)
+                root.focusAt(Qt.point(0.5, 0.5))
         }
     }
 
@@ -101,10 +104,23 @@ Item {
     // handle() probe meaningful. It's covered by the composited LiveCameraItem
     // on top, so it's here to render + feed the OCR filter, not to be seen.
     VideoOutput {
+        id: viewFinder
         objectName: "cameraVO"
         anchors.fill: parent
         source: cam
         filters: [ LiveOcrFilter {} ]
+    }
+
+    // Re-arms continuous AF a few seconds after a manual focus tap, matching
+    // lomiri-camera-app's behaviour so the camera doesn't stay locked on the
+    // tapped point forever.
+    Timer {
+        id: autoFocusRevertTimer
+        interval: 5000
+        onTriggered: {
+            cam.focus.focusMode = Camera.FocusContinuous
+            cam.focus.focusPointMode = Camera.FocusPointAuto
+        }
     }
 
     // The composited camera + translation overlay, rendered on the GPU. The
@@ -124,13 +140,20 @@ Item {
         anchors.fill: parent
         onClicked: {
             focusRing.showAt(mouse.x, mouse.y)
+            // setCustomFocusPoint is the only call that actually invokes
+            // android_camera_start_autofocus() in qtubuntu-camera, and the HAL
+            // only honours the focus region when focusMode is FocusAuto — so
+            // drop out of continuous for the tap and let autoFocusRevertTimer
+            // snap it back.
+            root.focusAt(viewFinder.mapPointToSourceNormalized(Qt.point(mouse.x, mouse.y)))
             if (appBridge.live_ocr_active)
                 appBridge.request_live_acquire()
         }
     }
 
     // Tap indicator: a ring that pops at the tap point and fades, mirroring the
-    // Android viewfinder. Focus stays continuous; this is purely a hint.
+    // Android viewfinder. The MouseArea above also kicks an actual autofocus at
+    // this point — the ring is the visual half of that.
     Rectangle {
         id: focusRing
         width: Math.round(Math.min(root.width, root.height) * 0.16)

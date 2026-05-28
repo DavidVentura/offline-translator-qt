@@ -192,37 +192,6 @@ impl QQuickItem for RenderedImageItem {
     }
 }
 
-/// Wrap an owned RGBA/RGBX buffer in a `QImage` without copying: the QImage
-/// borrows the buffer and a cleanup callback frees it when the last copy of the
-/// QImage is destroyed (after the scene graph has uploaded it to a texture).
-/// Used on the live path so the compositor writes straight into the buffer the
-/// QImage shows.
-pub fn qimage_from_owned_rgba(width: u32, height: u32, bytes: Vec<u8>) -> QImage {
-    let expected_len = width.saturating_mul(height).saturating_mul(4) as usize;
-    if width == 0 || height == 0 || bytes.len() != expected_len {
-        return QImage::default();
-    }
-    let mut boxed = Box::new(bytes);
-    let data_ptr = boxed.as_mut_ptr();
-    let info = Box::into_raw(boxed) as *mut std::os::raw::c_void;
-    let w = width as i32;
-    let h = height as i32;
-    cpp!(unsafe [
-        w as "int",
-        h as "int",
-        data_ptr as "unsigned char *",
-        info as "void *"
-    ] -> QImage as "QImage" {
-        return QImage(data_ptr, w, h, w * 4, QImage::Format_RGBX8888,
-            [](void *p) {
-                rust!(RenderedImageItem_free_owned_buf [p: *mut std::os::raw::c_void as "void *"] {
-                    drop(unsafe { Box::from_raw(p as *mut Vec<u8>) });
-                });
-            },
-            info);
-    })
-}
-
 pub fn qimage_from_rgba_bytes(width: u32, height: u32, rgba_bytes: &[u8]) -> QImage {
     let expected_len = width.saturating_mul(height).saturating_mul(4) as usize;
     if width == 0 || height == 0 || rgba_bytes.len() != expected_len {

@@ -5,3 +5,4 @@ Icon=assets/logo.png
 Terminal=false
 Type=Application
 X-Lomiri-Touch=true
+X-Lomiri-Rotates-Window-Contents=true
