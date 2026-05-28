@@ -14,20 +14,11 @@ use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
 use image::{GenericImageView, ImageReader, imageops::FilterType};
-use translator::font_provider::{FontHandle, FontProvider, FontRequest};
 use translator::live_frame::LiveFrame;
 use translator::live_tracker_pipeline::{LiveTrackerPipeline, TargetMode};
 use translator::{Rect, TranslatorSession};
 
-struct DejaVuFontProvider;
-
-impl FontProvider for DejaVuFontProvider {
-    fn locate(&self, _request: &FontRequest) -> Vec<FontHandle> {
-        vec![FontHandle::from(
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        )]
-    }
-}
+use crate::fonts;
 
 static PIPELINE: OnceLock<Arc<LiveTrackerPipeline>> = OnceLock::new();
 static LIVE_FRAME_TICK: OnceLock<Arc<dyn Fn() + Send + Sync>> = OnceLock::new();
@@ -88,7 +79,7 @@ pub fn set_live_active(active: bool) {
 }
 
 pub fn init_live_pipeline(session: Arc<TranslatorSession>) {
-    let pipeline = LiveTrackerPipeline::new(session, Arc::new(DejaVuFontProvider));
+    let pipeline = LiveTrackerPipeline::new(session, fonts::provider());
     pipeline.set_languages("en", "nl", false);
     let _ = PIPELINE.set(pipeline);
 }
@@ -129,7 +120,7 @@ pub fn run_benchmark(
     };
     eprintln!("bench: image {w}x{h} (max_side={max_side}) from={from} to={to} frames={frames}");
 
-    let pipeline = LiveTrackerPipeline::new(session, Arc::new(DejaVuFontProvider));
+    let pipeline = LiveTrackerPipeline::new(session, fonts::provider());
     pipeline.set_languages(from, to, false);
 
     let frame = Arc::new(LiveFrame::new((w * h * 4) as usize));

@@ -35,19 +35,6 @@ pub struct ManageLanguageListItem {
 }
 
 #[derive(Clone, Default, SimpleListItem)]
-pub struct ImageOverlayListItem {
-    pub block_x: f32,
-    pub block_y: f32,
-    pub block_width: f32,
-    pub block_height: f32,
-    pub suggested_font_size_px: f32,
-    pub line_rects: QString,
-    pub translated_text: QString,
-    pub background_color: QString,
-    pub foreground_color: QString,
-}
-
-#[derive(Clone, Default, SimpleListItem)]
 pub struct TtsVoiceListItem {
     pub name: QString,
     pub display_name: QString,
@@ -134,14 +121,4 @@ pub(crate) fn update_manage_progress_item(
     if let Some(index) = index {
         model.change_line(index, manage_language_to_list_item(language, expanded));
     }
-}
-
-pub fn argb_to_qml_color(color: u32) -> QString {
-    QString::from(format!(
-        "#{:02X}{:02X}{:02X}{:02X}",
-        (color >> 24) & 0xFF,
-        (color >> 16) & 0xFF,
-        (color >> 8) & 0xFF,
-        color & 0xFF
-    ))
 }

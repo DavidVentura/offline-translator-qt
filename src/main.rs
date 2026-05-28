@@ -6,6 +6,7 @@ mod catalog_state;
 mod data;
 mod download;
 mod eventloop;
+mod fonts;
 mod image_ocr;
 mod live_camera_item;
 mod live_gpu;

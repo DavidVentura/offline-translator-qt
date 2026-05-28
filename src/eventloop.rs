@@ -13,7 +13,7 @@ use crate::image_ocr;
 use crate::model::FeatureKind;
 use crate::rendered_image_item::qimage_from_rgba_bytes;
 use crate::tts;
-use crate::ui::{ImageOverlayListItem, TtsVoiceListItem, UiCallbacks, argb_to_qml_color};
+use crate::ui::{TtsVoiceListItem, UiCallbacks};
 use crate::{AppPaths, IoEvent};
 
 pub fn run_eventloop(bus_rx: Receiver<IoEvent>, ui: UiCallbacks, session: Arc<TranslatorSession>) {
@@ -162,55 +162,12 @@ pub fn run_eventloop(bus_rx: Receiver<IoEvent>, ui: UiCallbacks, session: Arc<Tr
                         (ui.set_processed_image)(qimage_from_rgba_bytes(
                             image_translation.image_width,
                             image_translation.image_height,
-                            &image_translation.cleaned_rgba_bytes,
+                            &image_translation.rendered_rgba_bytes,
                         ));
                         send_detection_to_ui(&image_translation.extracted_text, &ui);
                         (ui.set_input_text)(image_translation.extracted_text);
                         (ui.set_output_text)(image_translation.translated_text);
-                        let overlay_items = image_translation
-                            .overlay_blocks
-                            .into_iter()
-                            .map(|block| ImageOverlayListItem {
-                                line_rects: serde_json::to_string(
-                                    &block
-                                        .lines
-                                        .iter()
-                                        .map(|line| {
-                                            serde_json::json!({
-                                                "x": line.x,
-                                                "y": line.y,
-                                                "width": line.width,
-                                                "height": line.height,
-                                                "foreground_color": argb_to_qml_color(line.foreground_argb).to_string(),
-                                            })
-                                        })
-                                        .collect::<Vec<_>>(),
-                                )
-                                .unwrap_or_else(|err| {
-                                    eprintln!("Failed to encode OCR line rects: {err}");
-                                    "[]".to_string()
-                                })
-                                .into(),
-                                block_x: block.x as f32,
-                                block_y: block.y as f32,
-                                block_width: block.width as f32,
-                                block_height: block.height as f32,
-                                suggested_font_size_px: block.suggested_font_size_px,
-                                translated_text: block.translated_text.into(),
-                                background_color: argb_to_qml_color(block.background_argb),
-                                foreground_color: argb_to_qml_color(block.foreground_argb),
-                            })
-                            .collect::<Vec<_>>();
-                        (ui.set_image_overlay)(
-                            overlay_items,
-                            image_translation.image_width as f32,
-                            image_translation.image_height as f32,
-                        );
-                        println!(
-                            "image_ocr postprocess persist_png={:?} ui_model={:?}",
-                            Duration::ZERO,
-                            ui_start.elapsed()
-                        );
+                        println!("image_ocr postprocess ui={:?}", ui_start.elapsed());
                     }
                     Err(message) => {
                         (ui.set_input_text)(String::new());

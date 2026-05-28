@@ -2,37 +2,17 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use image::{GenericImageView, ImageDecoder, ImageReader, imageops::FilterType};
+use translator::image_render::{RenderOptions, render_overlay};
 use translator::{BackgroundMode, OcrSourceSelection, PreferredOcrEngine, TranslatorSession};
 
-#[derive(Debug, Clone)]
-pub struct ImageOverlayLine {
-    pub x: u32,
-    pub y: u32,
-    pub width: u32,
-    pub height: u32,
-    pub foreground_argb: u32,
-}
-
-#[derive(Debug, Clone)]
-pub struct ImageOverlayBlock {
-    pub x: u32,
-    pub y: u32,
-    pub width: u32,
-    pub height: u32,
-    pub suggested_font_size_px: f32,
-    pub lines: Vec<ImageOverlayLine>,
-    pub translated_text: String,
-    pub background_argb: u32,
-    pub foreground_argb: u32,
-}
+use crate::fonts;
 
 pub struct ImageTranslation {
     pub extracted_text: String,
     pub translated_text: String,
     pub image_width: u32,
     pub image_height: u32,
-    pub cleaned_rgba_bytes: Vec<u8>,
-    pub overlay_blocks: Vec<ImageOverlayBlock>,
+    pub rendered_rgba_bytes: Vec<u8>,
 }
 
 struct LoadedImage {
@@ -106,46 +86,35 @@ pub fn translate_image_with_session(
         })?;
     let process_elapsed = process_start.elapsed();
 
-    let overlay_blocks = prepared
-        .blocks
-        .into_iter()
-        .map(|block| ImageOverlayBlock {
-            suggested_font_size_px: block.layout_hints.suggested_font_size_px,
-            lines: block
-                .lines
-                .iter()
-                .map(|line| ImageOverlayLine {
-                    x: line.bounding_box.left,
-                    y: line.bounding_box.top,
-                    width: line.bounding_box.width(),
-                    height: line.bounding_box.height(),
-                    foreground_argb: line.foreground_argb,
-                })
-                .collect(),
-            x: block.bounding_box.left,
-            y: block.bounding_box.top,
-            width: block.bounding_box.width(),
-            height: block.bounding_box.height(),
-            translated_text: block.translated_text,
-            background_argb: block.background_argb,
-            foreground_argb: block.foreground_argb,
-        })
-        .collect::<Vec<_>>();
+    let render_start = Instant::now();
+    let opts = RenderOptions {
+        language: target_code.to_string(),
+        min_font_size_px: 8.0,
+    };
+    let provider = fonts::provider();
+    let rendered_rgba_bytes = match render_overlay(&prepared, &*provider, &opts) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            eprintln!("image_render render_overlay failed: {err}; showing erased background");
+            prepared.rgba_bytes.clone()
+        }
+    };
+    let render_elapsed = render_start.elapsed();
 
     println!(
-        "image_ocr timings load={:?} process={:?} total={:?}",
+        "image_ocr timings load={:?} process={:?} render={:?} total={:?}",
         load_elapsed,
         process_elapsed,
+        render_elapsed,
         total_start.elapsed()
     );
 
     Ok(ImageTranslation {
         extracted_text: prepared.extracted_text,
         translated_text: prepared.translated_text,
-        image_width: loaded.width,
-        image_height: loaded.height,
-        cleaned_rgba_bytes: prepared.rgba_bytes,
-        overlay_blocks,
+        image_width: prepared.width,
+        image_height: prepared.height,
+        rendered_rgba_bytes,
     })
 }
 

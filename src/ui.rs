@@ -9,8 +9,8 @@ mod types;
 
 pub use callbacks::{UiCallbacks, create_ui_callbacks};
 pub use types::{
-    DictionaryPopupRowItem, ImageOverlayListItem, LanguageListItem, ManageLanguageListItem,
-    ManageTtsVoicePackListItem, TtsVoiceListItem, argb_to_qml_color,
+    DictionaryPopupRowItem, LanguageListItem, ManageLanguageListItem, ManageTtsVoicePackListItem,
+    TtsVoiceListItem,
 };
 
 use qmetaobject::*;
@@ -129,7 +129,6 @@ pub struct AppBridge {
     pub available_languages_model: qt_property!(RefCell<SimpleListModel<LanguageListItem>>; CONST),
     pub manage_languages_model: qt_property!(RefCell<SimpleListModel<ManageLanguageListItem>>; CONST),
     pub manage_tts_picker_model: qt_property!(RefCell<SimpleListModel<ManageTtsVoicePackListItem>>; CONST),
-    pub image_overlay_model: qt_property!(RefCell<SimpleListModel<ImageOverlayListItem>>; CONST),
     pub tts_voice_options_model: qt_property!(RefCell<SimpleListModel<TtsVoiceListItem>>; CONST),
     pub dictionary_popup_rows_model: qt_property!(RefCell<SimpleListModel<DictionaryPopupRowItem>>; CONST),
 
@@ -462,7 +461,6 @@ pub struct AppBridge {
             self.set_selected_image_url_value(String::new());
             self.set_processed_image_value(QImage::default());
             self.set_share_image_url_value(String::new());
-            self.set_image_overlay_value(Vec::new(), 0.0, 0.0);
         }
     ),
     pub open_image_viewer: qt_method!(

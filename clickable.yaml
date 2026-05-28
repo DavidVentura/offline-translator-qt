@@ -4,8 +4,10 @@ builder: rust
 cargo_home: /home/david/.clickable/cargo
 dependencies_host:
 - libpulse-dev
+- libfontconfig1-dev
 dependencies_target:
 - libpulse-dev
+- libfontconfig1-dev
 - qtmultimedia5-dev
 - qtdeclarative5-dev
 env_vars:

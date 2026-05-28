@@ -22,9 +22,8 @@ use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 use std::time::Instant;
 
 use glow::HasContext;
-use translator::Rect;
-use translator::gl_renderer::{ExternalPresentTarget, GlesRenderer};
-use translator::live_frame::LiveFrame;
+use translator::gl_renderer::GlesRenderer;
+use translator::live_gpu_tick::{frame_from_camera_gray, run_tracker_with_acquire};
 use translator::live_tracker_pipeline::LiveTrackerPipeline;
 
 use crate::live_ocr::{fire_frame_tick, live_pipeline};
@@ -282,27 +281,20 @@ impl RenderState {
         let sg_fbo = unsafe { self.gl.get_parameter_i32(glow::FRAMEBUFFER_BINDING) };
 
         let uv = compute_uv_mat(cam_w as f32, cam_h as f32, fw as f32, fh as f32);
-        self.gles.set_camera_external(id, uv);
-
         // One transform for both the OCR readback and the present, so the frame
         // the OCR sees is exactly what's displayed (no divergent orientation).
         let dx = display_xform(fw as f32, fh as f32);
 
         // Per-frame: a one-channel luma readback feeds the tracker (no RGBA
         // transfer, no CPU RGBA→luma). The expensive full-res RGBA readback only
-        // happens on acquire/refresh, below. The glReadPixels stall is billed
-        // outside the pipeline's `[lt]` total, so it's timed separately.
+        // happens on acquire/refresh, inside run_tracker_with_acquire. The
+        // glReadPixels stall is billed outside the pipeline's `[lt]` total, so
+        // it's timed separately.
         let t_read = Instant::now();
-        let Some(gray) = self.gles.read_camera_gray(fw, fh, &dx) else {
+        let Some(frame) = frame_from_camera_gray(&mut self.gles, id, fw, fh, uv, dx) else {
             return;
         };
         let readback_ms = t_read.elapsed().as_secs_f32() * 1000.0;
-        // Fresh frame per present, never reused. An in-flight acquire holds its
-        // frame's state lock for the whole det+rec (~1s); reusing one frame would
-        // make this `reset_*` block on that lock and freeze the render thread for
-        // the entire acquire. A new Arc each frame keeps them independent.
-        let frame = std::sync::Arc::new(LiveFrame::new(0));
-        frame.reset_gray(gray, fw, fh);
 
         // Composite into the owned present FBO, not the screen: the scene graph
         // already rendered this pass (the LiveCameraItem node shows the previous
@@ -316,33 +308,9 @@ impl RenderState {
             self.gl.viewport(0, 0, screen_w, screen_h);
         }
 
-        let crop = Rect {
-            left: 0,
-            top: 0,
-            right: fw,
-            bottom: fh,
-        };
         let ts = self.start.elapsed().as_nanos() as u64;
-        let result = {
-            let mut target = ExternalPresentTarget {
-                renderer: &mut self.gles,
-                display_xform: dx,
-            };
-            pipeline.process_frame(&frame, crop, &mut target, fw, fh, fw, fh, fw, fh, ts)
-        };
-        match result {
-            // The tracker wants to acquire/refresh but the gray frame has no
-            // RGBA. Read back the full-res RGBA once and hand it to the worker.
-            Ok(r) => {
-                if let Some(req) = r.rgb_request {
-                    if let Some(rgba) = self.gles.read_camera_rgba(fw, fh, &dx) {
-                        let rgb_frame = std::sync::Arc::new(LiveFrame::new(0));
-                        rgb_frame.reset_owned(rgba, fw, fh, 0);
-                        pipeline.provide_acquire_rgb(req, &rgb_frame);
-                    }
-                }
-            }
-            Err(e) => eprintln!("live GPU process_frame failed: {e:?}"),
+        if let Err(e) = run_tracker_with_acquire(pipeline, &mut self.gles, &frame, fw, fh, dx, ts) {
+            eprintln!("live GPU process_frame failed: {e:?}");
         }
 
         // Hand the scene-graph target back to Qt for the buffer swap.

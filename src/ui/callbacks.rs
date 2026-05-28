@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::model::{FeatureKind, Language};
 
-use super::{AppBridge, ImageOverlayListItem, TtsVoiceListItem};
+use super::{AppBridge, TtsVoiceListItem};
 
 #[derive(Clone)]
 pub struct UiCallbacks {
@@ -15,7 +15,6 @@ pub struct UiCallbacks {
     pub set_tts_voices: Arc<dyn Fn(bool, Vec<TtsVoiceListItem>, String, String) + Send + Sync>,
     pub set_processed_image: Arc<dyn Fn(QImage) + Send + Sync>,
     pub notify_live_frame: Arc<dyn Fn() + Send + Sync>,
-    pub set_image_overlay: Arc<dyn Fn(Vec<ImageOverlayListItem>, f32, f32) + Send + Sync>,
     pub set_detected_language_code: Arc<dyn Fn(String) + Send + Sync>,
 }
 
@@ -81,14 +80,6 @@ pub fn create_ui_callbacks(app: QPointer<AppBridge>) -> UiCallbacks {
         }
     });
 
-    let image_overlay_app = app.clone();
-    let set_image_overlay = queued_callback(move |args: (Vec<ImageOverlayListItem>, f32, f32)| {
-        if let Some(app) = image_overlay_app.as_pinned() {
-            app.borrow_mut()
-                .set_image_overlay_value(args.0, args.1, args.2);
-        }
-    });
-
     let detected_app = app.clone();
     let set_detected_language_code = queued_callback(move |code: String| {
         if let Some(app) = detected_app.as_pinned() {
@@ -111,9 +102,6 @@ pub fn create_ui_callbacks(app: QPointer<AppBridge>) -> UiCallbacks {
         ),
         set_processed_image: Arc::new(set_processed_image),
         notify_live_frame: Arc::new(move || bump_live_frame_tick(())),
-        set_image_overlay: Arc::new(move |items, width, height| {
-            set_image_overlay((items, width, height))
-        }),
         set_detected_language_code: Arc::new(set_detected_language_code),
     }
 }

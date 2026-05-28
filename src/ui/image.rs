@@ -3,7 +3,7 @@ use qmetaobject::{QImage, QString};
 use crate::IoEvent;
 use crate::rendered_image_item::qimage_from_rgba_bytes;
 
-use super::{AppBridge, ImageOverlayListItem};
+use super::AppBridge;
 
 impl AppBridge {
     pub(crate) fn set_image_mode_value(&mut self, value: bool) {
@@ -22,9 +22,20 @@ impl AppBridge {
     }
 
     pub(crate) fn set_processed_image_value(&mut self, image: QImage) {
+        let size = image.size();
+        let width = size.width as f32;
+        let height = size.height as f32;
         if self.processed_image != image {
             self.processed_image = image;
             self.processed_image_changed();
+        }
+        if (self.processed_image_width - width).abs() > f32::EPSILON {
+            self.processed_image_width = width;
+            self.processed_image_width_changed();
+        }
+        if (self.processed_image_height - height).abs() > f32::EPSILON {
+            self.processed_image_height = height;
+            self.processed_image_height_changed();
         }
     }
 
@@ -45,24 +56,6 @@ impl AppBridge {
         if self.image_viewer_open != value {
             self.image_viewer_open = value;
             self.image_viewer_open_changed();
-        }
-    }
-
-    pub(crate) fn set_image_overlay_value(
-        &mut self,
-        items: Vec<ImageOverlayListItem>,
-        width: f32,
-        height: f32,
-    ) {
-        self.image_overlay_model.borrow_mut().reset_data(items);
-
-        if (self.processed_image_width - width).abs() > f32::EPSILON {
-            self.processed_image_width = width;
-            self.processed_image_width_changed();
-        }
-        if (self.processed_image_height - height).abs() > f32::EPSILON {
-            self.processed_image_height = height;
-            self.processed_image_height_changed();
         }
     }
 
@@ -109,10 +102,8 @@ impl AppBridge {
         self.set_share_image_url_value(url);
         if let Some((rgba_bytes, width, height)) = preview {
             self.set_processed_image_value(qimage_from_rgba_bytes(width, height, &rgba_bytes));
-            self.set_image_overlay_value(Vec::new(), width as f32, height as f32);
         } else {
             self.set_processed_image_value(QImage::default());
-            self.set_image_overlay_value(Vec::new(), 0.0, 0.0);
         }
         self.set_input_text_value(String::new());
         self.set_output_text_value("Running OCR...".to_string());
@@ -142,11 +133,6 @@ impl AppBridge {
         }
 
         self.stop_tts();
-        self.set_image_overlay_value(
-            Vec::new(),
-            self.processed_image_width,
-            self.processed_image_height,
-        );
         self.set_image_viewer_open_value(false);
         self.set_output_text_value("Running OCR...".to_string());
         self.set_detected_language_code_value("");
