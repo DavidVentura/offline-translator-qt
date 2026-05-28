@@ -259,7 +259,11 @@ Item {
         anchors.margins: ui.dp(12)
         width: ui.dp(40)
         height: ui.dp(40)
-        onClicked: root.appBridge.close_live_camera()
+        // Defer: closing deactivates the Loader and tears down the Camera,
+        // whose QCamera::statusChanged then fires into receivers that may
+        // already be partially destroyed if we run it inline from the click
+        // event. Same pattern as imageCapture.onImageSaved above.
+        onClicked: Qt.callLater(root.appBridge.close_live_camera)
     }
 
     // Bottom controls: torch (left), shutter (centre), live-OCR toggle (right).
