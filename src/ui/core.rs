@@ -31,6 +31,7 @@ impl AppBridge {
             session: Some(session),
             previous_screen: Screen::Translation,
             desktop_mode,
+            doc_translate_images: true,
             ..Default::default()
         };
         if cfg!(debug_assertions) {

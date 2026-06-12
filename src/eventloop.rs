@@ -8,6 +8,7 @@ use cld2::{Format, detect_language};
 use translator::TranslatorSession;
 
 use crate::catalog_state::languages_from_overview;
+use crate::document::{self, DocumentError, DocumentEvent, DocumentProgress};
 use crate::download;
 use crate::image_ocr;
 use crate::model::FeatureKind;
@@ -18,6 +19,7 @@ use crate::{AppPaths, IoEvent};
 
 pub fn run_eventloop(bus_rx: Receiver<IoEvent>, ui: UiCallbacks, session: Arc<TranslatorSession>) {
     let mut app_paths = None::<AppPaths>;
+    let mut document_cancel = None::<Arc<AtomicBool>>;
 
     while let Ok(msg) = bus_rx.recv() {
         match msg {
@@ -176,6 +178,37 @@ pub fn run_eventloop(bus_rx: Receiver<IoEvent>, ui: UiCallbacks, session: Arc<Tr
                 }
                 println!("image translation took {:?}", start.elapsed());
             }
+            IoEvent::DocumentTranslationRequest {
+                input_path,
+                from,
+                to,
+                translate_pdf_images,
+            } => {
+                let Some(app_paths) = app_paths.clone() else {
+                    (ui.set_document_event)(DocumentEvent::Failed {
+                        message: "app paths not initialized".to_string(),
+                    });
+                    continue;
+                };
+                let cancel = Arc::new(AtomicBool::new(false));
+                document_cancel = Some(cancel.clone());
+                spawn_document_job(
+                    Arc::clone(&session),
+                    ui.clone(),
+                    app_paths,
+                    input_path,
+                    from,
+                    to,
+                    translate_pdf_images,
+                    cancel,
+                );
+            }
+            IoEvent::CancelDocumentTranslation => {
+                if let Some(cancel) = document_cancel.take() {
+                    cancel.store(true, Ordering::Relaxed);
+                    session.cancel_ongoing_work();
+                }
+            }
             IoEvent::Shutdown => {
                 tts::stop_playback();
                 println!("shutdown signal, exiting");
@@ -184,6 +217,68 @@ pub fn run_eventloop(bus_rx: Receiver<IoEvent>, ui: UiCallbacks, session: Arc<Tr
         }
     }
     println!("all senders done, closing");
+}
+
+/// `{data}/translated/{stem}.{from}-{to}.{ext}` — under the app's own data
+/// dir so a ContentHub export can read it.
+fn document_output_path(data_dir: &str, input_path: &str, from: &str, to: &str) -> String {
+    let input = std::path::Path::new(input_path);
+    let stem = input
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("document");
+    let ext = input
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("bin")
+        .to_ascii_lowercase();
+    format!("{data_dir}/translated/{stem}.{from}-{to}.{ext}")
+}
+
+#[allow(clippy::too_many_arguments)]
+fn spawn_document_job(
+    session: Arc<TranslatorSession>,
+    ui: UiCallbacks,
+    app_paths: AppPaths,
+    input_path: String,
+    from: String,
+    to: String,
+    translate_pdf_images: bool,
+    cancel: Arc<AtomicBool>,
+) {
+    thread::spawn(move || {
+        let output_path = document_output_path(&app_paths.data, &input_path, &from, &to);
+        let available: Vec<translator::LanguageCode> = session
+            .language_overview()
+            .into_iter()
+            .filter(|entry| entry.availability.translator_files() || entry.language.is_english())
+            .map(|entry| translator::LanguageCode::from(entry.language.code))
+            .collect();
+
+        let start = Instant::now();
+        let progress_ui = ui.clone();
+        let result = document::translate_document(
+            &session,
+            &input_path,
+            &output_path,
+            &from,
+            &to,
+            &available,
+            translate_pdf_images,
+            &cancel,
+            &move |progress: DocumentProgress| {
+                (progress_ui.set_document_event)(DocumentEvent::Progress(progress));
+            },
+        );
+        println!("document translation took {:?}", start.elapsed());
+
+        let event = match result {
+            Ok(()) => DocumentEvent::Done { output_path },
+            Err(DocumentError::Cancelled) => DocumentEvent::Cancelled,
+            Err(DocumentError::Other(message)) => DocumentEvent::Failed { message },
+        };
+        (ui.set_document_event)(event);
+    });
 }
 
 fn download_feature(

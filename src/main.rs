@@ -4,6 +4,7 @@
 
 mod catalog_state;
 mod data;
+mod document;
 mod download;
 mod eventloop;
 mod fonts;
@@ -67,6 +68,13 @@ enum IoEvent {
         max_image_size: u32,
         background_mode: String,
     },
+    DocumentTranslationRequest {
+        input_path: String,
+        from: String,
+        to: String,
+        translate_pdf_images: bool,
+    },
+    CancelDocumentTranslation,
     RefreshTtsVoices {
         language_code: String,
         selected_voice_name: String,
@@ -129,6 +137,45 @@ fn main() -> Result<(), Box<dyn Error>> {
             app_paths.data.clone(),
         ));
         live_ocr::run_benchmark(session, &image, &from, &to, max_side, 60);
+        return Ok(());
+    }
+    if let Some(pos) = args.iter().position(|a| a == "--translate-doc") {
+        let input = args.get(pos + 1).cloned().unwrap_or_default();
+        let from = args
+            .get(pos + 2)
+            .cloned()
+            .unwrap_or_else(|| "en".to_string());
+        let to = args
+            .get(pos + 3)
+            .cloned()
+            .unwrap_or_else(|| "nl".to_string());
+        let pdf_images = args.iter().any(|a| a == "--pdf-images");
+        let app_paths = get_app_paths();
+        let session = Arc::new(TranslatorSession::from_catalog(
+            bundled_catalog(),
+            app_paths.data.clone(),
+        ));
+        session.refresh_snapshot();
+        let output = format!("{input}.{from}-{to}.out");
+        let available: Vec<translator::LanguageCode> = session
+            .language_overview()
+            .into_iter()
+            .filter(|entry| entry.availability.translator_files() || entry.language.is_english())
+            .map(|entry| translator::LanguageCode::from(entry.language.code))
+            .collect();
+        let cancel = std::sync::atomic::AtomicBool::new(false);
+        let result = document::translate_document(
+            &session,
+            &input,
+            &output,
+            &from,
+            &to,
+            &available,
+            pdf_images,
+            &cancel,
+            &|progress| eprintln!("doc progress: {progress:?}"),
+        );
+        eprintln!("doc result: {result:?} output={output}");
         return Ok(());
     }
 

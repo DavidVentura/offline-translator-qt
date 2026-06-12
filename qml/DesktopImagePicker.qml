@@ -10,10 +10,14 @@ Item {
 
     FileDialog {
         id: picker
-        title: "Choose an image"
-        nameFilters: ["Images (*.png *.jpg *.jpeg *.webp *.bmp *.gif *.tif *.tiff)"]
+        title: "Choose an image or document"
+        nameFilters: [
+            "Images and documents (*.png *.jpg *.jpeg *.webp *.bmp *.gif *.tif *.tiff *.pdf *.epub *.odt *.txt)",
+            "Documents (*.pdf *.epub *.odt *.txt)",
+            "Images (*.png *.jpg *.jpeg *.webp *.bmp *.gif *.tif *.tiff)"
+        ]
         selectExisting: true
         selectMultiple: false
-        onAccepted: appBridge.process_image_selection(fileUrl.toString())
+        onAccepted: appBridge.process_file_selection(fileUrl.toString())
     }
 }

@@ -1,6 +1,7 @@
 mod callbacks;
 mod core;
 mod dictionary;
+mod document;
 mod image;
 mod languages;
 mod transliteration;
@@ -148,6 +149,43 @@ pub struct AppBridge {
 
     pub ocr_max_image_size: qt_property!(i32; NOTIFY ocr_max_image_size_changed),
     pub ocr_max_image_size_changed: qt_signal!(),
+
+    pub doc_drawer_open: qt_property!(bool; NOTIFY doc_drawer_open_changed),
+    pub doc_drawer_open_changed: qt_signal!(),
+    pub doc_file_name: qt_property!(QString; NOTIFY doc_file_name_changed),
+    pub doc_file_name_changed: qt_signal!(),
+    pub doc_file_size: qt_property!(QString; NOTIFY doc_file_size_changed),
+    pub doc_file_size_changed: qt_signal!(),
+    pub doc_is_pdf: qt_property!(bool; NOTIFY doc_is_pdf_changed),
+    pub doc_is_pdf_changed: qt_signal!(),
+    pub doc_translate_images: qt_property!(bool; NOTIFY doc_translate_images_changed),
+    pub doc_translate_images_changed: qt_signal!(),
+
+    pub doc_progress_open: qt_property!(bool; NOTIFY doc_progress_open_changed),
+    pub doc_progress_open_changed: qt_signal!(),
+    pub doc_progress_label: qt_property!(QString; NOTIFY doc_progress_label_changed),
+    pub doc_progress_label_changed: qt_signal!(),
+    pub doc_text_fraction: qt_property!(f32; NOTIFY doc_text_fraction_changed),
+    pub doc_text_fraction_changed: qt_signal!(),
+    pub doc_show_pdf_phases: qt_property!(bool; NOTIFY doc_show_pdf_phases_changed),
+    pub doc_show_pdf_phases_changed: qt_signal!(),
+    pub doc_images_current: qt_property!(i32; NOTIFY doc_images_current_changed),
+    pub doc_images_current_changed: qt_signal!(),
+    pub doc_images_total: qt_property!(i32; NOTIFY doc_images_total_changed),
+    pub doc_images_total_changed: qt_signal!(),
+    pub doc_raster_current: qt_property!(i32; NOTIFY doc_raster_current_changed),
+    pub doc_raster_current_changed: qt_signal!(),
+    pub doc_raster_total: qt_property!(i32; NOTIFY doc_raster_total_changed),
+    pub doc_raster_total_changed: qt_signal!(),
+
+    pub doc_done_open: qt_property!(bool; NOTIFY doc_done_open_changed),
+    pub doc_done_open_changed: qt_signal!(),
+    pub doc_error: qt_property!(QString; NOTIFY doc_error_changed),
+    pub doc_error_changed: qt_signal!(),
+    pub doc_output_url: qt_property!(QString; NOTIFY doc_output_url_changed),
+    pub doc_output_url_changed: qt_signal!(),
+    pub doc_output_name: qt_property!(QString; NOTIFY doc_output_name_changed),
+    pub doc_output_name_changed: qt_signal!(),
 
     pub catalog_index_url: qt_property!(QString; NOTIFY catalog_index_url_changed),
     pub catalog_index_url_changed: qt_signal!(),
@@ -455,6 +493,37 @@ pub struct AppBridge {
             self.process_image_selection_impl(url.to_string());
         }
     ),
+    pub process_file_selection: qt_method!(
+        fn process_file_selection(&mut self, url: QString) {
+            self.process_file_selection_impl(url.to_string());
+        }
+    ),
+    pub start_document_translation: qt_method!(
+        fn start_document_translation(&mut self) {
+            self.start_document_translation_impl();
+        }
+    ),
+    pub cancel_document_translation: qt_method!(
+        fn cancel_document_translation(&mut self) {
+            self.cancel_document_translation_impl();
+        }
+    ),
+    pub close_document_drawer: qt_method!(
+        fn close_document_drawer(&mut self) {
+            if self.doc_drawer_open {
+                self.doc_drawer_open = false;
+                self.doc_drawer_open_changed();
+            }
+        }
+    ),
+    pub close_document_done: qt_method!(
+        fn close_document_done(&mut self) {
+            if self.doc_done_open {
+                self.doc_done_open = false;
+                self.doc_done_open_changed();
+            }
+        }
+    ),
     pub clear_selected_image: qt_method!(
         fn clear_selected_image(&mut self) {
             self.original_image_path.clear();
@@ -625,6 +694,7 @@ pub struct AppBridge {
     tts_voice_overrides: BTreeMap<String, String>,
     tts_prewarmed_language_code: String,
     original_image_path: String,
+    pending_document_path: String,
     manage_filter: String,
     expanded_languages: HashSet<String>,
     manage_tts_picker_language_code: String,

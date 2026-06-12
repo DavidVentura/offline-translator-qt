@@ -1,6 +1,7 @@
 use qmetaobject::*;
 use std::sync::Arc;
 
+use crate::document::DocumentEvent;
 use crate::model::{FeatureKind, Language};
 
 use super::{AppBridge, TtsVoiceListItem};
@@ -16,6 +17,7 @@ pub struct UiCallbacks {
     pub set_processed_image: Arc<dyn Fn(QImage) + Send + Sync>,
     pub notify_live_frame: Arc<dyn Fn() + Send + Sync>,
     pub set_detected_language_code: Arc<dyn Fn(String) + Send + Sync>,
+    pub set_document_event: Arc<dyn Fn(DocumentEvent) + Send + Sync>,
 }
 
 pub fn create_ui_callbacks(app: QPointer<AppBridge>) -> UiCallbacks {
@@ -87,6 +89,13 @@ pub fn create_ui_callbacks(app: QPointer<AppBridge>) -> UiCallbacks {
         }
     });
 
+    let document_app = app.clone();
+    let set_document_event = queued_callback(move |event: DocumentEvent| {
+        if let Some(app) = document_app.as_pinned() {
+            app.borrow_mut().apply_document_event(event);
+        }
+    });
+
     UiCallbacks {
         set_languages: Arc::new(set_languages),
         set_feature_progress: Arc::new(move |code, feature, progress| {
@@ -103,5 +112,6 @@ pub fn create_ui_callbacks(app: QPointer<AppBridge>) -> UiCallbacks {
         set_processed_image: Arc::new(set_processed_image),
         notify_live_frame: Arc::new(move || bump_live_frame_tick(())),
         set_detected_language_code: Arc::new(set_detected_language_code),
+        set_document_event: Arc::new(set_document_event),
     }
 }

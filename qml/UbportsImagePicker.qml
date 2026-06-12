@@ -16,7 +16,9 @@ Item {
         visible: false
         showTitle: true
         headerText: "Choose from"
-        contentType: ContentType.Pictures
+        // Documents + pictures: the bridge routes by extension (pdf/epub/odt/
+        // txt → document drawer, anything else → image OCR).
+        contentType: ContentType.All
         handler: ContentHandler.Source
 
         onCancelPressed: {
@@ -45,7 +47,7 @@ Item {
             if (activeTransfer.state === ContentTransfer.Charged &&
                     activeTransfer.items &&
                     activeTransfer.items.length > 0) {
-                appBridge.process_image_selection(activeTransfer.items[0].url.toString())
+                appBridge.process_file_selection(activeTransfer.items[0].url.toString())
                 root.activeTransfer = null
             } else if (activeTransfer.state === ContentTransfer.Aborted ||
                        activeTransfer.state === ContentTransfer.Finalized) {

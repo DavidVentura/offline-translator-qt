@@ -4,6 +4,8 @@ import Lomiri.Content 1.1
 Item {
     id: root
     property var appBridge
+    property var shareContentType: ContentType.Pictures
+    property var shareHandler: ContentHandler.Share
     property string pendingUrl: ""
     property var activeTransfer: null
     property var sharedItem: null
@@ -44,8 +46,8 @@ Item {
         anchors.fill: parent
         visible: false
         showTitle: false
-        contentType: ContentType.Pictures
-        handler: ContentHandler.Share
+        contentType: root.shareContentType
+        handler: root.shareHandler
         onPeerSelected: {
             visible = false
             if (!pendingUrl.length) {

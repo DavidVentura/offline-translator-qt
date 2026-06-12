@@ -68,6 +68,21 @@ Item {
         }
     }
 
+    Loader {
+        id: documentShareLoader
+        active: !appBridge.desktop_mode
+        parent: Overlay.overlay
+        anchors.fill: parent
+        z: 41
+        source: "UbportsDocumentShare.qml"
+
+        onLoaded: {
+            if (item) {
+                item.appBridge = appBridge
+            }
+        }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.leftMargin: ui.dp(16)
@@ -700,6 +715,366 @@ Item {
             radius: width / 2
             color: parent.down ? Qt.darker(theme.accentColor, 1.15) : theme.accentColor
             border.width: 0
+        }
+    }
+
+    // Document-translate drawer: file info + options + start, shown after
+    // picking a pdf/epub/odt/txt.
+    MouseArea {
+        visible: appBridge.doc_drawer_open
+        anchors.fill: parent
+        z: 15
+        onClicked: appBridge.close_document_drawer()
+
+        Rectangle {
+            anchors.fill: parent
+            color: "#80000000"
+        }
+    }
+
+    Rectangle {
+        id: documentDrawer
+        visible: appBridge.doc_drawer_open
+        z: 16
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height: drawerColumn.implicitHeight + ui.dp(40)
+        radius: ui.dp(16)
+        color: "#222530"
+        border.color: theme.borderColor
+        border.width: 1
+
+        // Square off the bottom corners.
+        Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: parent.radius
+            color: parent.color
+        }
+
+        MouseArea {
+            anchors.fill: parent
+        }
+
+        Column {
+            id: drawerColumn
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: ui.dp(20)
+            spacing: ui.dp(14)
+
+            Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: ui.dp(36)
+                height: ui.dp(4)
+                radius: height / 2
+                color: theme.surfaceAltColor
+            }
+
+            Column {
+                width: parent.width
+                spacing: ui.dp(2)
+
+                Label {
+                    width: parent.width
+                    text: appBridge.doc_file_name
+                    color: theme.textPrimary
+                    font.pixelSize: ui.dp(16)
+                    elide: Text.ElideMiddle
+                }
+                Label {
+                    text: appBridge.doc_file_size
+                    color: theme.textSecondary
+                    font.pixelSize: ui.dp(13)
+                }
+            }
+
+            DarkSwitch {
+                visible: appBridge.doc_is_pdf
+                width: parent.width
+                label: "Translate images in PDF"
+                theme: root.theme
+                desktopMode: appBridge.desktop_mode
+                checked: appBridge.doc_translate_images
+                onToggled: appBridge.doc_translate_images = checked
+            }
+
+            Button {
+                width: parent.width
+                height: ui.dp(48)
+                text: "Translate"
+                font.pixelSize: ui.dp(16)
+                onClicked: appBridge.start_document_translation()
+                contentItem: Label {
+                    text: parent.text
+                    font: parent.font
+                    color: "#1E1E2E"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                background: Rectangle {
+                    radius: height / 2
+                    color: parent.down ? Qt.darker(theme.accentColor, 1.15) : theme.accentColor
+                }
+            }
+        }
+    }
+
+    // Progress modal while a document translation runs.
+    Rectangle {
+        visible: appBridge.doc_progress_open
+        anchors.fill: parent
+        z: 17
+        color: "#80000000"
+
+        MouseArea {
+            anchors.fill: parent
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: Math.min(parent.width - ui.dp(48), ui.dp(360))
+            height: progressColumn.implicitHeight + ui.dp(40)
+            radius: ui.dp(16)
+            color: "#222530"
+            border.color: theme.borderColor
+            border.width: 1
+
+            Column {
+                id: progressColumn
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: ui.dp(20)
+                spacing: ui.dp(12)
+
+                Item {
+                    width: parent.width
+                    height: ui.dp(28)
+
+                    Label {
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: appBridge.doc_progress_label
+                        color: theme.textPrimary
+                        font.pixelSize: ui.dp(19)
+                    }
+
+                    FeedbackIconButton {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: ui.dp(24)
+                        height: ui.dp(24)
+                        iconSize: ui.dp(22)
+                        iconSource: appBridge.asset_url("close.svg")
+                        onClicked: appBridge.cancel_document_translation()
+                    }
+                }
+
+                Label {
+                    width: parent.width
+                    text: appBridge.doc_file_name
+                    color: theme.textSecondary
+                    font.pixelSize: ui.dp(14)
+                    elide: Text.ElideMiddle
+                }
+
+                Column {
+                    width: parent.width
+                    spacing: ui.dp(4)
+
+                    Item {
+                        width: parent.width
+                        height: ui.dp(18)
+                        Label {
+                            anchors.left: parent.left
+                            text: "Text"
+                            color: theme.textPrimary
+                            font.pixelSize: ui.dp(14)
+                        }
+                        Label {
+                            anchors.right: parent.right
+                            text: Math.round(appBridge.doc_text_fraction * 100) + "%"
+                            color: theme.textSecondary
+                            font.pixelSize: ui.dp(14)
+                        }
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: ui.dp(4)
+                        radius: height / 2
+                        color: theme.surfaceAltColor
+                        Rectangle {
+                            width: parent.width * Math.min(1, appBridge.doc_text_fraction)
+                            height: parent.height
+                            radius: parent.radius
+                            color: theme.accentColor
+                        }
+                    }
+                }
+
+                Column {
+                    visible: appBridge.doc_show_pdf_phases
+                    width: parent.width
+                    spacing: ui.dp(4)
+
+                    Item {
+                        width: parent.width
+                        height: ui.dp(18)
+                        Label {
+                            anchors.left: parent.left
+                            text: "Images"
+                            color: theme.textPrimary
+                            font.pixelSize: ui.dp(14)
+                        }
+                        Label {
+                            anchors.right: parent.right
+                            text: appBridge.doc_images_current + "/" + appBridge.doc_images_total
+                            color: theme.textSecondary
+                            font.pixelSize: ui.dp(14)
+                        }
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: ui.dp(4)
+                        radius: height / 2
+                        color: theme.surfaceAltColor
+                        Rectangle {
+                            width: appBridge.doc_images_total > 0
+                                   ? parent.width * Math.min(1, appBridge.doc_images_current / appBridge.doc_images_total)
+                                   : 0
+                            height: parent.height
+                            radius: parent.radius
+                            color: theme.accentColor
+                        }
+                    }
+                }
+
+                Column {
+                    visible: appBridge.doc_show_pdf_phases
+                    width: parent.width
+                    spacing: ui.dp(4)
+
+                    Item {
+                        width: parent.width
+                        height: ui.dp(18)
+                        Label {
+                            anchors.left: parent.left
+                            text: "Bitmap pages"
+                            color: theme.textPrimary
+                            font.pixelSize: ui.dp(14)
+                        }
+                        Label {
+                            anchors.right: parent.right
+                            text: appBridge.doc_raster_current + "/" + appBridge.doc_raster_total
+                            color: theme.textSecondary
+                            font.pixelSize: ui.dp(14)
+                        }
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: ui.dp(4)
+                        radius: height / 2
+                        color: theme.surfaceAltColor
+                        Rectangle {
+                            width: appBridge.doc_raster_total > 0
+                                   ? parent.width * Math.min(1, appBridge.doc_raster_current / appBridge.doc_raster_total)
+                                   : 0
+                            height: parent.height
+                            radius: parent.radius
+                            color: theme.accentColor
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Done / error modal after a document translation finishes.
+    Rectangle {
+        visible: appBridge.doc_done_open
+        anchors.fill: parent
+        z: 18
+        color: "#80000000"
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: appBridge.close_document_done()
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: Math.min(parent.width - ui.dp(48), ui.dp(360))
+            height: doneColumn.implicitHeight + ui.dp(40)
+            radius: ui.dp(16)
+            color: "#222530"
+            border.color: theme.borderColor
+            border.width: 1
+
+            MouseArea {
+                anchors.fill: parent
+            }
+
+            Column {
+                id: doneColumn
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: ui.dp(20)
+                spacing: ui.dp(12)
+
+                Label {
+                    text: appBridge.doc_error.length > 0 ? "Translation failed" : "Translated file"
+                    color: theme.textPrimary
+                    font.pixelSize: ui.dp(19)
+                }
+
+                Label {
+                    width: parent.width
+                    text: appBridge.doc_file_name
+                    color: theme.textSecondary
+                    font.pixelSize: ui.dp(14)
+                    elide: Text.ElideMiddle
+                }
+
+                Label {
+                    visible: appBridge.doc_error.length === 0
+                    width: parent.width
+                    text: "Translated file:\n" + appBridge.doc_output_name
+                    color: theme.textPrimary
+                    font.pixelSize: ui.dp(14)
+                    wrapMode: Text.Wrap
+                }
+
+                Label {
+                    visible: appBridge.doc_error.length > 0
+                    width: parent.width
+                    text: appBridge.doc_error
+                    color: theme.textPrimary
+                    font.pixelSize: ui.dp(14)
+                    wrapMode: Text.Wrap
+                }
+
+                Label {
+                    visible: appBridge.doc_error.length === 0 && !appBridge.desktop_mode
+                    anchors.right: parent.right
+                    text: "Save"
+                    color: theme.accentColor
+                    font.pixelSize: ui.dp(15)
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -ui.dp(8)
+                        onClicked: {
+                            if (documentShareLoader.item) {
+                                documentShareLoader.item.share(appBridge.doc_output_url)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
