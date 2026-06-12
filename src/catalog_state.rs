@@ -73,7 +73,9 @@ pub fn languages_from_overview(overview: Vec<LanguageOverview>) -> Vec<Language>
                 dictionary_code: library_language.dictionary_code,
                 direction,
                 built_in,
-                core_size_bytes: entry.core_size_bytes,
+                // English is the pivot: its overview core size sums every en↔X
+                // pair (~2 GB), but there is nothing to download for it.
+                core_size_bytes: if built_in { 0 } else { entry.core_size_bytes },
                 core_installed: entry.core_installed,
                 core_progress: 0.0,
                 dictionary_size_bytes: entry.dictionary_size_bytes,

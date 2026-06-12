@@ -161,6 +161,7 @@ struct RenderState {
     present_fbo: Option<glow::Framebuffer>,
     present_tex: Option<glow::Texture>,
     present_size: Option<(u32, u32)>,
+    overlay_oversample: Option<f32>,
     start: Instant,
     frames: u32,
     gap_ms_sum: f32,
@@ -184,6 +185,7 @@ impl RenderState {
             present_fbo: None,
             present_tex: None,
             present_size: None,
+            overlay_oversample: None,
             start: Instant::now(),
             frames: 0,
             gap_ms_sum: 0.0,
@@ -311,14 +313,36 @@ impl RenderState {
         // its gray FBO bound; point at the present FBO and size the viewport to
         // the screen so the composite fills it.
         self.ensure_present_fbo(screen_w as u32, screen_h as u32);
+        // present_camera binds its own target; point it at our FBO instead of
+        // the default framebuffer so the QML scene stays on top.
+        self.gles
+            .set_present_fbo(self.present_fbo.map(|f| f.0.get()).unwrap_or(0));
         unsafe {
             self.gl
                 .bind_framebuffer(glow::FRAMEBUFFER, self.present_fbo);
             self.gl.viewport(0, 0, screen_w, screen_h);
         }
 
+        // Bake the overlay near display res (texels per canonical unit), not at
+        // the ≤1000px canonical res, so warped text stays sharp on screen.
+        let oversample = screen_w as f32 / fw as f32;
+        if self.overlay_oversample != Some(oversample) {
+            pipeline.set_overlay_oversample(oversample);
+            self.overlay_oversample = Some(oversample);
+        }
+
         let ts = self.start.elapsed().as_nanos() as u64;
-        if let Err(e) = run_tracker_with_acquire(pipeline, &mut self.gles, &frame, fw, fh, dx, ts) {
+        if let Err(e) = run_tracker_with_acquire(
+            pipeline,
+            &mut self.gles,
+            &frame,
+            fw,
+            fh,
+            screen_w as u32,
+            screen_h as u32,
+            dx,
+            ts,
+        ) {
             eprintln!("live GPU process_frame failed: {e:?}");
         }
 

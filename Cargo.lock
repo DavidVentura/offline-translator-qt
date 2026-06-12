@@ -599,7 +599,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1342,17 +1342,7 @@ dependencies = [
 [[package]]
 name = "mnn-sys"
 version = "0.1.0"
-dependencies = [
- "bindgen 0.69.5",
- "cc",
- "cmake",
- "ndarray 0.16.1",
-]
-
-[[package]]
-name = "mnn-sys"
-version = "0.1.0"
-source = "git+https://github.com/DavidVentura/mnn-sys#f9643f744dead887665b9ad498aa82b2c8316455"
+source = "git+https://github.com/DavidVentura/mnn-sys#9c379709025b9f95d1aa6b3a2b35bf4206f4eeac"
 dependencies = [
  "bindgen 0.69.5",
  "cc",
@@ -1543,7 +1533,6 @@ dependencies = [
  "fontconfig",
  "glow",
  "image",
- "mnn-sys 0.1.0",
  "qmetaobject",
  "qttypes",
  "rayon",
@@ -1688,7 +1677,7 @@ source = "git+https://github.com/DavidVentura/piper-rs#7776f7bae83b82a3add2e2d64
 dependencies = [
  "espeak-rs",
  "log",
- "mnn-sys 0.1.0 (git+https://github.com/DavidVentura/mnn-sys)",
+ "mnn-sys",
  "mucab",
  "ndarray 0.16.1",
  "ndarray-npy",
@@ -2069,7 +2058,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2245,7 +2234,7 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 [[package]]
 name = "slimt-sys"
 version = "0.1.0"
-source = "git+https://github.com/DavidVentura/slimt-sys#7d8dd0cd391b025faaff20521f1390b54f1bf547"
+source = "git+https://github.com/DavidVentura/slimt-sys#0e97fc9024d1f5bc657095a7985971f71368d1a4"
 dependencies = [
  "cmake",
 ]
@@ -2510,8 +2499,9 @@ dependencies = [
  "icu_locale_core",
  "image",
  "imageproc",
+ "libc",
  "log",
- "mnn-sys 0.1.0 (git+https://github.com/DavidVentura/mnn-sys)",
+ "mnn-sys",
  "mucab",
  "ndarray 0.16.1",
  "piper-rs",
@@ -2813,15 +2803,6 @@ name = "windows-sys"
 version = "0.52.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
-dependencies = [
- "windows-targets",
-]
-
-[[package]]
-name = "windows-sys"
-version = "0.59.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e38bc4d79ed67fd075bcc251a1c39b32a1776bbe92e5bef1f0bf1f8c531853b"
 dependencies = [
  "windows-targets",
 ]

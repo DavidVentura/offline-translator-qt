@@ -130,20 +130,17 @@ pub fn run_benchmark(
         right: w,
         bottom: h,
     };
-    let mut dst = vec![0u8; (w * h * 4) as usize];
     let mut timestamp_ns: u64 = 0;
 
     for i in 0..frames {
         frame.reset_owned(rgba.clone(), w, h, 0);
         let started = Instant::now();
-        let mut target = translator::live_compositor::SliceTarget { dst: &mut dst[..] };
-        let result =
-            pipeline.process_frame(&frame, crop, &mut target, w, h, w, h, w, h, timestamp_ns);
+        let result = pipeline.process_frame(&frame, crop, w, h, timestamp_ns);
         let frame_ms = started.elapsed().as_secs_f32() * 1000.0;
         match result {
             Ok(r) => eprintln!(
-                "bench frame {i}: {frame_ms:.1}ms state={:?} inliers={} composite_bytes={} acquire={} refresh={}",
-                r.state, r.inliers, r.composite_bytes, r.started_acquire, r.started_refresh
+                "bench frame {i}: {frame_ms:.1}ms state={:?} inliers={} acquire={} refresh={}",
+                r.state, r.inliers, r.started_acquire, r.started_refresh
             ),
             Err(e) => eprintln!("bench frame {i}: {frame_ms:.1}ms ERR {}", e.message),
         }
@@ -160,11 +157,5 @@ pub fn run_benchmark(
             );
         }
         timestamp_ns += 33_000_000;
-    }
-
-    let out = format!("/tmp/live_bench_{w}x{h}.png");
-    match image::save_buffer(&out, &dst, w, h, image::ExtendedColorType::Rgba8) {
-        Ok(()) => eprintln!("bench: wrote composite to {out}"),
-        Err(e) => eprintln!("bench: failed to write {out}: {e}"),
     }
 }

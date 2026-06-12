@@ -73,7 +73,7 @@ pub fn translate_image_with_session(
             OcrSourceSelection::specific(source_code),
             target_code,
             min_confidence,
-            translator::ReadingOrder::LeftToRight,
+            None,
             background_mode,
             PreferredOcrEngine::Paddle,
         )

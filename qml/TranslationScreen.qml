@@ -670,10 +670,10 @@ Item {
         width: ui.dp(64)
         height: ui.dp(64)
         display: AbstractButton.IconOnly
-        icon.source: appBridge.asset_url("camera.svg")
+        icon.source: appBridge.asset_url("attach_file.svg")
         icon.width: ui.dp(28)
         icon.height: ui.dp(28)
-        text: "Camera"
+        text: "Attach"
         background: Rectangle {
             radius: width / 2
             color: parent.down ? Qt.darker(theme.accentColor, 1.15) : theme.accentColor
@@ -690,6 +690,10 @@ Item {
         anchors.bottomMargin: ui.dp(100)
         width: ui.dp(64)
         height: ui.dp(64)
+        display: AbstractButton.IconOnly
+        icon.source: appBridge.asset_url("camera.svg")
+        icon.width: ui.dp(28)
+        icon.height: ui.dp(28)
         text: "Live"
         onClicked: appBridge.open_live_camera()
         background: Rectangle {
