@@ -25,7 +25,7 @@ glow = { version = "0.17", default-features = false }
 [dependencies.translator]
 # git = "https://github.com/DavidVentura/translator-rs.git"
 path = "/home/david/git/translator-rs"
-features = ["tesseract", "tts", "transliterate", "mucab", "dictionary", "ppocr", "planar-tracker", "gpu", "pdf", "pdf-image-translate", "epub", "odt"]
+features = ["tts", "transliterate", "mucab", "dictionary", "ppocr", "planar-tracker", "gpu", "pdf", "pdf-image-translate", "epub", "odt"]
 
 [profile.dev]
 #debug = false

@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use image::{GenericImageView, ImageDecoder, ImageReader, imageops::FilterType};
 use translator::image_render::{RenderOptions, render_overlay};
-use translator::{BackgroundMode, OcrSourceSelection, PreferredOcrEngine, TranslatorSession};
+use translator::{BackgroundMode, OcrSourceSelection, TranslatorSession};
 
 use crate::fonts;
 
@@ -75,7 +75,6 @@ pub fn translate_image_with_session(
             min_confidence,
             None,
             background_mode,
-            PreferredOcrEngine::Paddle,
         )
         .map_err(|err| {
             if err.is_missing_asset() {
