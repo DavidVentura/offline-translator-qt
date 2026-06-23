@@ -147,28 +147,6 @@ checksum = "230c5f1ca6a325a32553f8640d31ac9b49f2411e901e427570154868b46da4f7"
 
 [[package]]
 name = "bindgen"
-version = "0.64.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4243e6031260db77ede97ad86c27e501d646a27ab57b59a574f725d98ab1fb4"
-dependencies = [
- "bitflags 1.3.2",
- "cexpr",
- "clang-sys",
- "lazy_static",
- "lazycell",
- "log",
- "peeking_take_while",
- "proc-macro2",
- "quote",
- "regex 1.12.3",
- "rustc-hash 1.1.0",
- "shlex",
- "syn 1.0.109",
- "which",
-]
-
-[[package]]
-name = "bindgen"
 version = "0.69.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "271383c67ccabffb7381723dea0672a673f292304fcb45c01cc648c7a8d58088"
@@ -358,7 +336,7 @@ checksum = "0b023947811758c97c59bf9d1c188fd619ad4718dcaa767947df1cadb14f39f4"
 dependencies = [
  "glob",
  "libc",
- "libloading 0.8.9",
+ "libloading",
 ]
 
 [[package]]
@@ -662,7 +640,7 @@ version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab8ecd87370524b461f8557c119c405552c396ed91fc0a8eec68679eab26f94a"
 dependencies = [
- "libloading 0.8.9",
+ "libloading",
 ]
 
 [[package]]
@@ -737,13 +715,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "espeak-rs"
 version = "0.1.9"
-source = "git+https://github.com/DavidVentura/piper-rs#7776f7bae83b82a3add2e2d64791ede03ed257e1"
+source = "git+https://github.com/DavidVentura/piper-rs#f3c5a393413349139a6546135f0384067490d5b6"
 dependencies = [
  "espeak-rs-sys",
 ]
@@ -751,7 +729,7 @@ dependencies = [
 [[package]]
 name = "espeak-rs-sys"
 version = "0.1.9"
-source = "git+https://github.com/DavidVentura/piper-rs#7776f7bae83b82a3add2e2d64791ede03ed257e1"
+source = "git+https://github.com/DavidVentura/piper-rs#f3c5a393413349139a6546135f0384067490d5b6"
 dependencies = [
  "bindgen 0.69.5",
  "cmake",
@@ -1474,27 +1452,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
 
 [[package]]
-name = "leptonica-plumbing"
-version = "1.4.0"
-source = "git+https://github.com/DavidVentura/leptonica-plumbing#c82398caf6da77462799dfd52611124b3ab64aa4"
-dependencies = [
- "leptonica-sys",
- "libc",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "leptonica-sys"
-version = "0.4.9"
-source = "git+https://github.com/DavidVentura/leptonica-sys#dc8c4339ba075aa41b913a358432bfdaf64155f3"
-dependencies = [
- "bindgen 0.64.0",
- "cmake",
- "pkg-config",
- "vcpkg",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1505,16 +1462,6 @@ name = "libloading"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
-dependencies = [
- "cfg-if",
- "windows-link",
-]
-
-[[package]]
-name = "libloading"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "754ca22de805bb5744484a5b151a9e1a8e837d5dc232c2d7d8c2e3492edc8b60"
 dependencies = [
  "cfg-if",
  "windows-link",
@@ -1588,7 +1535,7 @@ dependencies = [
  "rangemap",
  "sha2",
  "stringprep",
- "thiserror 2.0.18",
+ "thiserror",
  "ttf-parser",
  "weezl",
 ]
@@ -1691,12 +1638,12 @@ dependencies = [
 [[package]]
 name = "mnn-sys"
 version = "0.1.0"
-source = "git+https://github.com/DavidVentura/mnn-sys#9c379709025b9f95d1aa6b3a2b35bf4206f4eeac"
+source = "git+https://github.com/DavidVentura/mnn-sys#01b736b9e27320bdea6ab0eab207d6a934f4a515"
 dependencies = [
  "bindgen 0.69.5",
  "cc",
  "cmake",
- "ndarray 0.16.1",
+ "ndarray",
 ]
 
 [[package]]
@@ -1776,28 +1723,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "ndarray"
-version = "0.17.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "520080814a7a6b4a6e9070823bb24b4531daac8c4627e08ba5de8c5ef2f2752d"
-dependencies = [
- "matrixmultiply",
- "num-complex",
- "num-integer",
- "num-traits",
- "portable-atomic",
- "portable-atomic-util",
- "rawpointer",
-]
-
-[[package]]
 name = "ndarray-npy"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b313788c468c49141a9d9b6131fc15f403e6ef4e8446a0b2e18f664ddb278a9"
 dependencies = [
  "byteorder",
- "ndarray 0.16.1",
+ "ndarray",
  "num-complex",
  "num-traits",
  "py_literal",
@@ -1972,25 +1904,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ort"
-version = "2.0.0-rc.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a5df903c0d2c07b56950f1058104ab0c8557159f2741782223704de9be73c3c"
-dependencies = [
- "libloading 0.9.0",
- "ndarray 0.17.2",
- "ort-sys",
- "smallvec",
- "tracing",
-]
-
-[[package]]
-name = "ort-sys"
-version = "2.0.0-rc.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06503bb33f294c5f1ba484011e053bfa6ae227074bdb841e9863492dc5960d4b"
-
-[[package]]
 name = "owned_ttf_parser"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2056,12 +1969,6 @@ dependencies = [
  "digest",
  "hmac",
 ]
-
-[[package]]
-name = "peeking_take_while"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
 
 [[package]]
 name = "percent-encoding"
@@ -2160,19 +2067,19 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 [[package]]
 name = "piper-rs"
 version = "0.1.9"
-source = "git+https://github.com/DavidVentura/piper-rs#7776f7bae83b82a3add2e2d64791ede03ed257e1"
+source = "git+https://github.com/DavidVentura/piper-rs#f3c5a393413349139a6546135f0384067490d5b6"
 dependencies = [
  "espeak-rs",
  "log",
  "mnn-sys",
  "mucab",
- "ndarray 0.16.1",
+ "ndarray",
  "ndarray-npy",
- "ort",
  "rustfst",
  "serde",
  "serde_json",
  "unicode-normalization",
+ "zeekstd",
 ]
 
 [[package]]
@@ -2487,7 +2394,7 @@ checksum = "a4e608c6638b9c18977b00b475ac1f28d14e84b27d8d42f70e0bf1e3dec127ac"
 dependencies = [
  "getrandom 0.2.17",
  "libredox",
- "thiserror 2.0.18",
+ "thiserror",
 ]
 
 [[package]]
@@ -2954,63 +2861,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "tesseract"
-version = "0.15.2"
-source = "git+https://github.com/DavidVentura/tesseract-rs#b8567a32f51ab09262d50878f469ee7ea3a03c60"
-dependencies = [
- "tesseract-plumbing",
- "tesseract-sys",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "tesseract-plumbing"
-version = "0.11.1"
-source = "git+https://github.com/DavidVentura/tesseract-plumbing#38c306d5256c5ede346372bddb8665ea54f7fe02"
-dependencies = [
- "leptonica-plumbing",
- "tesseract-sys",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "tesseract-sys"
-version = "0.6.3"
-source = "git+https://github.com/DavidVentura/tesseract-sys#94e38ebd5b3c61c735f882e70670a988ea3f4b58"
-dependencies = [
- "bindgen 0.64.0",
- "cc",
- "cmake",
- "leptonica-sys",
-]
-
-[[package]]
-name = "thiserror"
-version = "1.0.69"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
-dependencies = [
- "thiserror-impl 1.0.69",
-]
-
-[[package]]
 name = "thiserror"
 version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
 dependencies = [
- "thiserror-impl 2.0.18",
-]
-
-[[package]]
-name = "thiserror-impl"
-version = "1.0.69"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
+ "thiserror-impl",
 ]
 
 [[package]]
@@ -3098,61 +2954,203 @@ dependencies = [
 ]
 
 [[package]]
-name = "tracing"
-version = "0.1.44"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100"
-dependencies = [
- "pin-project-lite",
- "tracing-core",
-]
-
-[[package]]
-name = "tracing-core"
-version = "0.1.36"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
-dependencies = [
- "once_cell",
-]
-
-[[package]]
 name = "translator"
 version = "0.1.0"
 dependencies = [
- "cld2",
- "fax",
- "glow",
- "icu_experimental",
- "icu_locale_core",
  "image",
  "imageproc",
- "libc",
  "log",
  "lopdf",
- "markup5ever",
- "markup5ever_rcdom",
- "mnn-sys",
- "mucab",
  "mupdf",
- "ndarray 0.16.1",
  "piper-rs",
  "rayon",
  "regex 1.12.3",
  "rustybuzz",
  "serde",
  "serde_json",
- "slimt-sys",
  "subsetter",
+ "translator-core",
+ "translator-dictionary",
+ "translator-doc",
+ "translator-gpu",
+ "translator-live",
+ "translator-mucab",
+ "translator-ocr",
+ "translator-pdf",
+ "translator-raster",
+ "translator-render",
+ "translator-tracker",
+ "translator-translate",
+ "translator-transliterate",
+ "translator-tts",
+ "ttf-parser",
+ "unicode-bidi",
+ "unicode-script",
+]
+
+[[package]]
+name = "translator-core"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "unicode-script",
+]
+
+[[package]]
+name = "translator-dictionary"
+version = "0.1.0"
+dependencies = [
  "tarkka",
- "tesseract",
+ "translator-core",
+]
+
+[[package]]
+name = "translator-doc"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "markup5ever",
+ "markup5ever_rcdom",
+ "translator-core",
+ "translator-translate",
+ "ttf-parser",
+ "xml5ever",
+ "zip",
+]
+
+[[package]]
+name = "translator-gpu"
+version = "0.1.0"
+dependencies = [
+ "glow",
+ "log",
+ "translator-core",
+ "translator-live",
+ "translator-raster",
+ "translator-render",
+]
+
+[[package]]
+name = "translator-live"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "log",
+ "translator-core",
+ "translator-ocr",
+ "translator-raster",
+ "translator-render",
+ "translator-tracker",
+ "translator-translate",
+]
+
+[[package]]
+name = "translator-mucab"
+version = "0.1.0"
+dependencies = [
+ "mucab",
+]
+
+[[package]]
+name = "translator-ocr"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "imageproc",
+ "libc",
+ "log",
+ "mnn-sys",
+ "rayon",
+ "translator-core",
+ "translator-raster",
+ "translator-translate",
+]
+
+[[package]]
+name = "translator-pdf"
+version = "0.1.0"
+dependencies = [
+ "fax",
+ "image",
+ "log",
+ "lopdf",
+ "mupdf",
+ "rustybuzz",
+ "subsetter",
+ "translator-core",
+ "translator-render",
+ "translator-translate",
+]
+
+[[package]]
+name = "translator-raster"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "log",
+ "translator-core",
+]
+
+[[package]]
+name = "translator-render"
+version = "0.1.0"
+dependencies = [
+ "rustybuzz",
+ "translator-core",
  "ttf-parser",
  "unicode-bidi",
  "unicode-linebreak",
  "unicode-script",
- "xml5ever",
  "zeno",
- "zip",
+]
+
+[[package]]
+name = "translator-tracker"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "log",
+ "rayon",
+ "translator-core",
+ "translator-render",
+]
+
+[[package]]
+name = "translator-translate"
+version = "0.1.0"
+dependencies = [
+ "cld2",
+ "log",
+ "markup5ever",
+ "markup5ever_rcdom",
+ "regex 1.12.3",
+ "serde",
+ "serde_json",
+ "slimt-sys",
+ "translator-core",
+]
+
+[[package]]
+name = "translator-transliterate"
+version = "0.1.0"
+dependencies = [
+ "icu_experimental",
+ "icu_locale_core",
+ "translator-core",
+ "translator-mucab",
+ "unicode-script",
+]
+
+[[package]]
+name = "translator-tts"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "piper-rs",
+ "translator-core",
+ "translator-transliterate",
 ]
 
 [[package]]
@@ -3291,12 +3289,6 @@ name = "utf8parse"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
-
-[[package]]
-name = "vcpkg"
-version = "0.2.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "version_check"
@@ -3526,7 +3518,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3921,7 +3913,7 @@ dependencies = [
  "memchr 2.8.0",
  "pbkdf2",
  "sha1",
- "thiserror 2.0.18",
+ "thiserror",
  "time",
  "xz2",
  "zeroize",

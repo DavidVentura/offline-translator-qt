@@ -75,6 +75,7 @@ pub fn translate_image_with_session(
             min_confidence,
             None,
             background_mode,
+            None,
         )
         .map_err(|err| {
             if err.is_missing_asset() {
@@ -92,7 +93,7 @@ pub fn translate_image_with_session(
     };
     let provider = fonts::provider();
     let rendered_rgba_bytes = match render_overlay(&prepared, &*provider, &opts) {
-        Ok(bytes) => bytes,
+        Ok(rendered) => rendered.rgba_bytes,
         Err(err) => {
             eprintln!("image_render render_overlay failed: {err}; showing erased background");
             prepared.rgba_bytes.clone()
