@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fast iteration build: same Alpine/musl env as the APK build, but runs
-# `cargo build` directly against the bind-mounted repo so `target/` and
-# onnxruntime's `build/` persist across runs. No abuild, no tarball.
+# `cargo build` directly against the bind-mounted repo so `target/` persists
+# across runs. No abuild, no tarball.
 #
 # Usage:
 #   ./packaging/postmarketos/dev-build.sh                  # cargo build --release

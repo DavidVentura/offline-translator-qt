@@ -179,7 +179,12 @@ fn play_text_streaming(
 ) -> Result<(), String> {
     let planning_started_at = Instant::now();
     let planned_chunks = catch_tts_panic(|| -> Result<Option<Vec<SpeechChunk>>, String> {
-        match session.plan_speech_chunks(language_code, text, None) {
+        match session.plan_speech_chunks(
+            language_code,
+            text,
+            None,
+            translator::UrlsAndHashtags::Skip,
+        ) {
             Ok(chunks) => Ok(Some(chunks)),
             Err(err) if err.is_missing_asset() => Ok(None),
             Err(err) => Err(err.message),

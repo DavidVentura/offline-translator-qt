@@ -13,7 +13,6 @@ export AUTOMATION_TEXT="${AUTOMATION_TEXT:-${3:-hello}}"
 export AUTOMATION_SCREENSHOT_PATH="${AUTOMATION_SCREENSHOT_PATH:-${4:-${repo_root}/screenshot.png}}"
 export AUTOMATION_QUIT="${AUTOMATION_QUIT:-1}"
 
-#./scripts/prepare_onnxruntime.sh
 cargo build
 rm -f "${AUTOMATION_SCREENSHOT_PATH}"
 xvfb-run -a cargo run

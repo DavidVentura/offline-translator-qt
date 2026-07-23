@@ -40,6 +40,17 @@ pub struct TtsVoiceListItem {
     pub display_name: QString,
 }
 
+/// One merged selection highlight, in image-pixel space. QML scales these by the same factor it
+/// scales the image itself.
+#[derive(Clone, Default, SimpleListItem)]
+pub struct SelectionPillItem {
+    pub cx: f32,
+    pub cy: f32,
+    pub width: f32,
+    pub height: f32,
+    pub angle_degrees: f32,
+}
+
 #[derive(Clone, Default, SimpleListItem)]
 pub struct DictionaryPopupRowItem {
     pub kind: QString,

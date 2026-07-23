@@ -7,6 +7,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
+use translator::api::ScriptedLanguage;
 use translator::{LanguageCode, TranslatorSession};
 
 use crate::fonts;
@@ -60,6 +61,15 @@ pub fn supported_document_extension(path: &str) -> Option<String> {
     matches!(ext.as_str(), "pdf" | "epub" | "odt" | "txt").then_some(ext)
 }
 
+fn installed_languages(session: &TranslatorSession) -> Vec<ScriptedLanguage> {
+    session
+        .language_overview()
+        .into_iter()
+        .filter(|entry| entry.availability.translator_files() || entry.language.is_english())
+        .map(|entry| entry.language.scripted())
+        .collect()
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn translate_document(
     session: &TranslatorSession,
@@ -67,7 +77,6 @@ pub fn translate_document(
     output_path: &str,
     source_code: &str,
     target_code: &str,
-    available: &[LanguageCode],
     translate_pdf_images: bool,
     cancel: &AtomicBool,
     on_progress: &(dyn Fn(DocumentProgress) + Sync),
@@ -97,6 +106,10 @@ pub fn translate_document(
     session.begin_document_translation();
     let extension = supported_document_extension(input_path)
         .ok_or_else(|| DocumentError::Other(format!("unsupported document type: {input_path}")))?;
+    let target = session
+        .scripted_language(&LanguageCode::from(target_code))
+        .ok_or_else(|| DocumentError::Other(format!("unknown target language: {target_code}")))?;
+    let available = installed_languages(session);
     let input_bytes = fs::read(input_path)
         .map_err(|error| DocumentError::Other(format!("failed to read document: {error}")))?;
     check_cancelled()?;
@@ -126,7 +139,7 @@ pub fn translate_document(
             &input_bytes,
             Some(source_code),
             target_code,
-            available,
+            &available,
             report_text,
         )
         .map_err(|error| match error {
@@ -138,7 +151,7 @@ pub fn translate_document(
             &input_bytes,
             Some(source_code),
             target_code,
-            available,
+            &available,
             report_text,
         )
         .map_err(|error| match error {
@@ -149,8 +162,8 @@ pub fn translate_document(
             session,
             &input_bytes,
             source_code,
-            target_code,
-            available,
+            &target,
+            &available,
             translate_pdf_images,
             &is_cancelled,
             on_progress,
@@ -181,8 +194,8 @@ fn translate_pdf(
     session: &TranslatorSession,
     input_bytes: &[u8],
     source_code: &str,
-    target_code: &str,
-    available: &[LanguageCode],
+    target: &ScriptedLanguage,
+    available: &[ScriptedLanguage],
     translate_pdf_images: bool,
     is_cancelled: &(dyn Fn() -> bool + Send + Sync),
     on_progress: &(dyn Fn(DocumentProgress) + Sync),
@@ -207,7 +220,7 @@ fn translate_pdf(
         session,
         input_bytes,
         Some(source_code),
-        target_code,
+        target,
         available,
         report_text,
     ) {
@@ -243,7 +256,7 @@ fn translate_pdf(
         &after_text,
         session,
         source_code,
-        target_code,
+        target.as_str(),
         &*fonts,
         &overlay_pages,
         is_cancelled,
@@ -270,7 +283,7 @@ fn translate_pdf(
         &xobject_output.bytes,
         session,
         source_code,
-        target_code,
+        target,
         &*fonts,
         &raster_pages,
         is_cancelled,

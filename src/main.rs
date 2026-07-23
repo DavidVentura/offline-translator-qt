@@ -19,6 +19,7 @@ mod settings;
 mod tts;
 mod ui;
 
+use cpp::cpp;
 use qmetaobject::*;
 use std::error::Error;
 use std::path::PathBuf;
@@ -33,6 +34,11 @@ use crate::settings::load_settings;
 use crate::ui::{AppBridge, create_ui_callbacks};
 
 const APP_NAME: &str = "dev.davidv.translator";
+
+cpp! {{
+    #include <QtCore/QCoreApplication>
+    #include <QtCore/QString>
+}}
 
 unsafe extern "C" {
     fn register_live_ocr_filter();
@@ -114,7 +120,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         env_logger::Env::default().default_filter_or("info,translator=debug"),
     )
     .init();
-    configure_onnxruntime_dylib_path()?;
 
     let args: Vec<String> = std::env::args().collect();
     if let Some(pos) = args.iter().position(|a| a == "--bench-live") {
@@ -157,12 +162,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         ));
         session.refresh_snapshot();
         let output = format!("{input}.{from}-{to}.out");
-        let available: Vec<translator::LanguageCode> = session
-            .language_overview()
-            .into_iter()
-            .filter(|entry| entry.availability.translator_files() || entry.language.is_english())
-            .map(|entry| translator::LanguageCode::from(entry.language.code))
-            .collect();
         let cancel = std::sync::atomic::AtomicBool::new(false);
         let result = document::translate_document(
             &session,
@@ -170,7 +169,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             &output,
             &from,
             &to,
-            &available,
             pdf_images,
             &cancel,
             &|progress| eprintln!("doc progress: {progress:?}"),
@@ -180,6 +178,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     qmetaobject::log::init_qt_to_rust();
+
+    // QSettings refuses to guess a file path without these, so every QSettings
+    // in this process — ours and the ones qtubuntu-camera opens for us — would
+    // otherwise be a no-op. The organization doubles as the config directory
+    // name, which under click confinement has to be the package name.
+    let identity = QString::from(APP_NAME);
+    cpp!(unsafe [identity as "QString"] {
+        QCoreApplication::setOrganizationName(identity);
+        QCoreApplication::setOrganizationDomain(identity);
+        QCoreApplication::setApplicationName(identity);
+    });
+
     qml_register_type::<rendered_image_item::RenderedImageItem>(
         c"TranslatorUi",
         1,
@@ -233,38 +243,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     bus_tx.send(IoEvent::Shutdown).unwrap();
     drop(bus_tx);
     jh.join().unwrap();
-
-    Ok(())
-}
-
-fn configure_onnxruntime_dylib_path() -> Result<(), Box<dyn Error>> {
-    if std::env::var_os("ORT_DYLIB_PATH").is_some() {
-        return Ok(());
-    }
-
-    let current_exe = std::env::current_exe()?;
-    let exe_dir = current_exe
-        .parent()
-        .map(PathBuf::from)
-        .ok_or("current executable has no parent directory")?;
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let target_arch = std::env::consts::ARCH;
-    let arch_relative = format!("runtime-lib/{target_arch}/libonnxruntime.so");
-    let mut candidates = Vec::new();
-    candidates.push(exe_dir.join("libonnxruntime.so"));
-    candidates.push(exe_dir.join(&arch_relative));
-
-    for ancestor in current_exe.ancestors().skip(1).take(5) {
-        candidates.push(ancestor.join("libonnxruntime.so"));
-        candidates.push(ancestor.join(&arch_relative));
-    }
-
-    candidates.push(manifest_dir.join(&arch_relative));
-
-    if let Some(path) = candidates.iter().find(|path| path.is_file()) {
-        // Set once during process startup before worker threads are spawned.
-        unsafe { std::env::set_var("ORT_DYLIB_PATH", path) };
-    }
 
     Ok(())
 }

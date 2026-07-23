@@ -69,7 +69,6 @@ pub fn languages_from_overview(overview: Vec<LanguageOverview>) -> Vec<Language>
             Language {
                 code,
                 name: library_language.display_name,
-                script: library_language.script,
                 dictionary_code: library_language.dictionary_code,
                 direction,
                 built_in,

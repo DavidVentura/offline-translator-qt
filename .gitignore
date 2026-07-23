@@ -12,5 +12,4 @@ packaging/flatpak/repo/
 packaging/flatpak/stage/
 packaging/flatpak/*.flatpak
 build/
-runtime-lib/*
 .clickable/*

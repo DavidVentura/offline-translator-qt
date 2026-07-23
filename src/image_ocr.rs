@@ -3,16 +3,22 @@ use std::time::Instant;
 
 use image::{GenericImageView, ImageDecoder, ImageReader, imageops::FilterType};
 use translator::image_render::{RenderOptions, render_overlay};
+use translator::ocr::{DetectedTextBox, PositionedWord};
 use translator::{BackgroundMode, OcrSourceSelection, TranslatorSession};
 
 use crate::fonts;
 
 pub struct ImageTranslation {
+    /// Only feeds language detection now; the translated text is read off the image.
     pub extracted_text: String,
-    pub translated_text: String,
     pub image_width: u32,
     pub image_height: u32,
     pub rendered_rgba_bytes: Vec<u8>,
+    /// The loaded image before erasing and overlay, for the original/translated flip. Same
+    /// dimensions as the rendered image, so both share one layout.
+    pub original_rgba_bytes: Vec<u8>,
+    pub source_words: Vec<PositionedWord>,
+    pub translated_words: Vec<PositionedWord>,
 }
 
 struct LoadedImage {
@@ -57,12 +63,28 @@ pub fn translate_image_with_session(
     min_confidence: u32,
     max_image_size: u32,
     background_mode_label: &str,
+    // Fired with the detector's boxes before recognition starts, so the UI can mark the regions
+    // it is about to scan. Detection is then handed to the pipeline rather than redone.
+    on_detected: &(dyn Fn(&[DetectedTextBox], u32, u32) + Sync),
 ) -> Result<ImageTranslation, String> {
     let total_start = Instant::now();
     let load_start = Instant::now();
     let loaded = load_image_rgba(image_path, max_image_size)?;
     let load_elapsed = load_start.elapsed();
     let background_mode = map_background_mode(background_mode_label);
+
+    let detect_start = Instant::now();
+    let detection = session
+        .detect_image_boxes(
+            &loaded.rgba_bytes,
+            loaded.width,
+            loaded.height,
+            max_image_size,
+        )
+        .map_err(|err| err.message)?;
+    on_detected(&detection, loaded.width, loaded.height);
+    let detect_elapsed = detect_start.elapsed();
+
     let process_start = Instant::now();
     let prepared = session
         .translate_image_rgba(
@@ -75,7 +97,7 @@ pub fn translate_image_with_session(
             min_confidence,
             None,
             background_mode,
-            None,
+            Some(detection),
         )
         .map_err(|err| {
             if err.is_missing_asset() {
@@ -92,29 +114,40 @@ pub fn translate_image_with_session(
         min_font_size_px: 8.0,
     };
     let provider = fonts::provider();
-    let rendered_rgba_bytes = match render_overlay(&prepared, &*provider, &opts) {
-        Ok(rendered) => rendered.rgba_bytes,
+    let (rendered_rgba_bytes, translated_words) = match render_overlay(&prepared, &*provider, &opts)
+    {
+        Ok(rendered) => (rendered.rgba_bytes, rendered.translated_words),
         Err(err) => {
             eprintln!("image_render render_overlay failed: {err}; showing erased background");
-            prepared.rgba_bytes.clone()
+            (prepared.rgba_bytes.clone(), Vec::new())
         }
     };
     let render_elapsed = render_start.elapsed();
 
     println!(
-        "image_ocr timings load={:?} process={:?} render={:?} total={:?}",
+        "image_ocr timings load={:?} detect={:?} process={:?} render={:?} total={:?}",
         load_elapsed,
+        detect_elapsed,
         process_elapsed,
         render_elapsed,
         total_start.elapsed()
     );
 
+    if prepared.width != loaded.width || prepared.height != loaded.height {
+        return Err(format!(
+            "overlay is {}x{} but the source is {}x{}; word boxes would not line up",
+            prepared.width, prepared.height, loaded.width, loaded.height
+        ));
+    }
+
     Ok(ImageTranslation {
         extracted_text: prepared.extracted_text,
-        translated_text: prepared.translated_text,
         image_width: prepared.width,
         image_height: prepared.height,
         rendered_rgba_bytes,
+        original_rgba_bytes: loaded.rgba_bytes,
+        source_words: prepared.source_words,
+        translated_words,
     })
 }
 

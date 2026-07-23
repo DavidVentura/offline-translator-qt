@@ -9,6 +9,36 @@ use crate::settings::{Settings, save_settings};
 
 use super::AppBridge;
 
+/// Which shell the app is running under. Ubuntu Touch is the only one with content-hub and a
+/// phone-shaped screen; a native run, `clickable desktop`, and anything else are all desktops.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Platform {
+    Desktop,
+    UbuntuTouch,
+}
+
+impl Platform {
+    /// Detects the phone rather than the desktop, so anything unrecognized — including a plain
+    /// `cargo run` outside clickable — gets the desktop affordances instead of silently taking
+    /// the content-hub path that only exists on device.
+    pub(crate) fn detect() -> Self {
+        // Explicit override wins, so `clickable desktop` and desktop-dev.sh keep working even if
+        // the launcher happens to set the device variables.
+        let forced_desktop = std::env::var_os("CLICKABLE_DESKTOP_MODE").is_some();
+        // ubuntu-app-launch sets APP_ID for every click app it starts; desktops do not.
+        let platform = match std::env::var_os("APP_ID") {
+            Some(_) if !forced_desktop => Platform::UbuntuTouch,
+            _ => Platform::Desktop,
+        };
+        eprintln!("platform: {platform:?} (forced_desktop={forced_desktop})");
+        platform
+    }
+
+    pub(crate) fn is_desktop(self) -> bool {
+        matches!(self, Platform::Desktop)
+    }
+}
+
 impl AppBridge {
     pub fn new(
         languages: Vec<Language>,
@@ -24,7 +54,7 @@ impl AppBridge {
             .filter(|s| !s.is_empty())
             .and_then(|s| s.parse::<i32>().ok())
             .unwrap_or(Screen::NoLanguages.as_i32());
-        let desktop_mode = std::env::var_os("CLICKABLE_DESKTOP_MODE").is_some();
+        let desktop_mode = Platform::detect().is_desktop();
         let mut app = AppBridge {
             current_screen,
             bus_tx: Some(bus_tx),

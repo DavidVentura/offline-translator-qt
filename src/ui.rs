@@ -8,10 +8,10 @@ mod transliteration;
 mod tts;
 mod types;
 
-pub use callbacks::{UiCallbacks, create_ui_callbacks};
+pub use callbacks::{ImageResult, UiCallbacks, create_ui_callbacks};
 pub use types::{
     DictionaryPopupRowItem, LanguageListItem, ManageLanguageListItem, ManageTtsVoicePackListItem,
-    TtsVoiceListItem,
+    SelectionPillItem, TtsVoiceListItem,
 };
 
 use qmetaobject::*;
@@ -132,6 +132,64 @@ pub struct AppBridge {
     pub manage_tts_picker_model: qt_property!(RefCell<SimpleListModel<ManageTtsVoicePackListItem>>; CONST),
     pub tts_voice_options_model: qt_property!(RefCell<SimpleListModel<TtsVoiceListItem>>; CONST),
     pub dictionary_popup_rows_model: qt_property!(RefCell<SimpleListModel<DictionaryPopupRowItem>>; CONST),
+    pub selection_pills_model: qt_property!(RefCell<SimpleListModel<SelectionPillItem>>; CONST),
+    /// Detector output shown while recognition runs, so the user sees which regions are being
+    /// scanned instead of a bare "Translating" label.
+    pub scan_boxes_model: qt_property!(RefCell<SimpleListModel<SelectionPillItem>>; CONST),
+
+    pub scan_active: qt_property!(bool; NOTIFY scan_active_changed),
+    pub scan_active_changed: qt_signal!(),
+
+    /// Set when an image translation fails. The only reason the text pane still appears in image
+    /// mode, since that is where the message lands.
+    pub image_error: qt_property!(QString; NOTIFY image_error_changed),
+    pub image_error_changed: qt_signal!(),
+
+    /// True once an image carries selectable words, which is what switches the screen from the
+    /// text output pane to on-image selection.
+    pub image_words_ready: qt_property!(bool; NOTIFY image_words_ready_changed),
+    pub image_words_ready_changed: qt_signal!(),
+
+    pub image_show_original: qt_property!(bool; NOTIFY image_show_original_changed),
+    pub image_show_original_changed: qt_signal!(),
+
+    pub selection_active: qt_property!(bool; NOTIFY selection_changed),
+    pub selection_text: qt_property!(QString; NOTIFY selection_changed),
+    pub selection_start_x: qt_property!(f32; NOTIFY selection_changed),
+    pub selection_start_y: qt_property!(f32; NOTIFY selection_changed),
+    pub selection_end_x: qt_property!(f32; NOTIFY selection_changed),
+    pub selection_end_y: qt_property!(f32; NOTIFY selection_changed),
+    pub selection_left: qt_property!(f32; NOTIFY selection_changed),
+    pub selection_top: qt_property!(f32; NOTIFY selection_changed),
+    pub selection_right: qt_property!(f32; NOTIFY selection_changed),
+    pub selection_bottom: qt_property!(f32; NOTIFY selection_changed),
+    pub selection_changed: qt_signal!(),
+
+    pub image_word_at: qt_method!(
+        fn image_word_at(&mut self, x: f32, y: f32) -> i32 {
+            self.image_word_at_impl(x, y)
+        }
+    ),
+    pub image_nearest_word: qt_method!(
+        fn image_nearest_word(&mut self, x: f32, y: f32, anchor: i32) -> i32 {
+            self.image_nearest_word_impl(x, y, anchor)
+        }
+    ),
+    pub set_image_selection: qt_method!(
+        fn set_image_selection(&mut self, start: i32, end: i32) {
+            self.set_image_selection_impl(start, end);
+        }
+    ),
+    pub clear_image_selection: qt_method!(
+        fn clear_image_selection(&mut self) {
+            self.clear_image_selection_impl();
+        }
+    ),
+    pub toggle_image_original: qt_method!(
+        fn toggle_image_original(&mut self) {
+            self.toggle_image_original_impl();
+        }
+    ),
 
     pub desktop_mode: qt_property!(bool; CONST),
     pub automation_enabled: qt_property!(bool; CONST),
@@ -694,10 +752,32 @@ pub struct AppBridge {
     tts_voice_overrides: BTreeMap<String, String>,
     tts_prewarmed_language_code: String,
     original_image_path: String,
+    /// Both rendered layers, held so the original/translated flip is a swap rather than a re-run.
+    image_layers: Option<ImageLayers>,
+    selection_anchor: Option<(u32, u32)>,
     pending_document_path: String,
     manage_filter: String,
     expanded_languages: HashSet<String>,
     manage_tts_picker_language_code: String,
     dictionary_popup_lookup_language_code: String,
     dictionary_popup_data: Option<WordWithTaggedEntries>,
+}
+
+/// The two drawable layers of a translated image plus the words selectable on each. Flipping
+/// swaps both together, so the text under the pointer always matches the picture.
+pub(crate) struct ImageLayers {
+    pub translated: QImage,
+    pub original: QImage,
+    pub source_words: Vec<translator::ocr::PositionedWord>,
+    pub translated_words: Vec<translator::ocr::PositionedWord>,
+}
+
+impl ImageLayers {
+    pub(crate) fn words(&self, show_original: bool) -> &[translator::ocr::PositionedWord] {
+        if show_original {
+            &self.source_words
+        } else {
+            &self.translated_words
+        }
+    }
 }

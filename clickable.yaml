@@ -24,4 +24,3 @@ install_root_data:
 - packaging/ubuntu-touch/translator-contenthub.json
 - packaging/ubuntu-touch/translator.desktop
 - assets
-- runtime-lib

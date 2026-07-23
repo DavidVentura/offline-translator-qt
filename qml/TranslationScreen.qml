@@ -10,6 +10,8 @@ Item {
     UiScale { id: ui; desktopMode: root.appBridge && root.appBridge.desktop_mode }
     readonly property real clipboardButtonSize: ui.dp(24)
     readonly property real clipboardIconSize: ui.dp(22)
+    readonly property bool imageSelectionMode: appBridge.image_mode
+                                              && appBridge.image_error.length === 0
     readonly property real imageOverlayButtonSize: appBridge.desktop_mode ? ui.dp(36) : ui.dp(40)
     readonly property real imageOverlayIconSize: appBridge.desktop_mode ? ui.dp(18) : ui.dp(20)
     readonly property real fullscreenOverlayButtonSize: ui.dp(40)
@@ -187,22 +189,71 @@ Item {
             }
         }
 
-        Rectangle {
+        Item {
             visible: appBridge.image_mode
             Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(ui.dp(380), Math.max(ui.dp(220), root.height * 0.42))
-            radius: 0
-            color: theme.backgroundElevated
-            border.color: theme.borderColor
-            border.width: 1
+            Layout.fillHeight: root.imageSelectionMode
+            Layout.preferredHeight: root.imageSelectionMode
+                                    ? Math.max(ui.dp(320), root.height * 0.72)
+                                    : Math.min(ui.dp(380), Math.max(ui.dp(220), root.height * 0.42))
+            // Clipped, but with no frame of its own: the picture is the surface, not a card on it.
             clip: true
 
             TranslatedImageView {
+                id: inlineImageView
                 anchors.fill: parent
                 appBridge: root.appBridge
-                imageMargin: ui.dp(12)
+                imageMargin: 0
                 interactive: true
-                onImageClicked: appBridge.open_image_viewer()
+            }
+
+            // Floating bar over the selection, mirroring the phone app's Copy / Share / Web search.
+            Rectangle {
+                id: selectionActions
+                visible: root.imageSelectionMode && appBridge.selection_active
+                z: 5
+                radius: height / 2
+                color: theme.backgroundElevated
+                border.color: theme.borderColor
+                border.width: 1
+                width: selectionActionRow.width + ui.dp(24)
+                height: selectionActionRow.height + ui.dp(12)
+                x: Math.max(ui.dp(8),
+                            Math.min(parent.width - width - ui.dp(8),
+                                     inlineImageView.mapX((appBridge.selection_left + appBridge.selection_right) / 2) - width / 2))
+                y: Math.max(ui.dp(8),
+                            inlineImageView.mapY(appBridge.selection_top) - height - ui.dp(10))
+
+                Row {
+                    id: selectionActionRow
+                    anchors.centerIn: parent
+                    spacing: ui.dp(18)
+
+                    Text {
+                        text: qsTr("Copy")
+                        color: theme.textPrimary
+                        font.pixelSize: ui.dp(14)
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -ui.dp(6)
+                            onClicked: {
+                                inlineImageView.copySelection()
+                                inlineImageView.clearSelection()
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: qsTr("Clear")
+                        color: theme.textSecondary
+                        font.pixelSize: ui.dp(14)
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -ui.dp(6)
+                            onClicked: inlineImageView.clearSelection()
+                        }
+                    }
+                }
             }
 
             Row {
@@ -210,6 +261,30 @@ Item {
                 anchors.right: parent.right
                 anchors.margins: ui.dp(12)
                 spacing: ui.dp(8)
+
+                Rectangle {
+                    visible: root.imageSelectionMode
+                    width: root.imageOverlayButtonSize
+                    height: root.imageOverlayButtonSize
+                    radius: width / 2
+                    color: flipOverlayMouse.pressed ? "#99000000"
+                                                    : (appBridge.image_show_original ? "#B33B82F6" : "#80000000")
+
+                    Image {
+                        anchors.centerIn: parent
+                        width: root.imageOverlayIconSize
+                        height: root.imageOverlayIconSize
+                        source: appBridge.asset_url("swap.svg")
+                        sourceSize.width: root.imageOverlayIconSize
+                        sourceSize.height: root.imageOverlayIconSize
+                    }
+
+                    MouseArea {
+                        id: flipOverlayMouse
+                        anchors.fill: parent
+                        onClicked: appBridge.toggle_image_original()
+                    }
+                }
 
                 Rectangle {
                     width: root.imageOverlayButtonSize
@@ -317,7 +392,7 @@ Item {
         }
 
         Rectangle {
-            visible: !appBridge.show_missing_card
+            visible: !appBridge.show_missing_card && !root.imageSelectionMode
             Layout.fillWidth: true
             color: "transparent"
             implicitHeight: ui.dp(8)
@@ -333,8 +408,9 @@ Item {
         }
 
         Item {
+            visible: !root.imageSelectionMode
             Layout.fillWidth: true
-            Layout.fillHeight: true
+            Layout.fillHeight: !root.imageSelectionMode
             Layout.preferredHeight: Math.max(ui.dp(180), root.height * 0.34)
             Layout.minimumHeight: ui.dp(140)
 
@@ -1056,6 +1132,21 @@ Item {
                     color: theme.textPrimary
                     font.pixelSize: ui.dp(14)
                     wrapMode: Text.Wrap
+                }
+
+                // Desktop has no content-hub to share into, so hand the file to whatever the
+                // system has registered for it.
+                Label {
+                    visible: appBridge.doc_error.length === 0 && appBridge.desktop_mode
+                    anchors.right: parent.right
+                    text: "Open"
+                    color: theme.accentColor
+                    font.pixelSize: ui.dp(15)
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -ui.dp(8)
+                        onClicked: Qt.openUrlExternally(appBridge.doc_output_url)
+                    }
                 }
 
                 Label {

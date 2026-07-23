@@ -14,7 +14,7 @@ use crate::image_ocr;
 use crate::model::FeatureKind;
 use crate::rendered_image_item::qimage_from_rgba_bytes;
 use crate::tts;
-use crate::ui::{TtsVoiceListItem, UiCallbacks};
+use crate::ui::{ImageResult, SelectionPillItem, TtsVoiceListItem, UiCallbacks};
 use crate::{AppPaths, IoEvent};
 
 pub fn run_eventloop(bus_rx: Receiver<IoEvent>, ui: UiCallbacks, session: Arc<TranslatorSession>) {
@@ -156,23 +156,50 @@ pub fn run_eventloop(bus_rx: Receiver<IoEvent>, ui: UiCallbacks, session: Arc<Tr
                     min_confidence,
                     max_image_size,
                     &background_mode,
+                    &|boxes, _w, _h| {
+                        (ui.set_detected_regions)(
+                            boxes
+                                .iter()
+                                .map(|b| SelectionPillItem {
+                                    cx: b.oriented_box.cx,
+                                    cy: b.oriented_box.cy,
+                                    width: b.oriented_box.width,
+                                    height: b.oriented_box.height,
+                                    angle_degrees: b.oriented_box.angle_radians.to_degrees(),
+                                })
+                                .collect(),
+                        );
+                    },
                 );
 
                 match result {
                     Ok(image_translation) => {
                         let ui_start = Instant::now();
-                        (ui.set_processed_image)(qimage_from_rgba_bytes(
-                            image_translation.image_width,
-                            image_translation.image_height,
-                            &image_translation.rendered_rgba_bytes,
-                        ));
+                        let width = image_translation.image_width;
+                        let height = image_translation.image_height;
+                        (ui.set_image_result)(ImageResult {
+                            translated: qimage_from_rgba_bytes(
+                                width,
+                                height,
+                                &image_translation.rendered_rgba_bytes,
+                            ),
+                            original: qimage_from_rgba_bytes(
+                                width,
+                                height,
+                                &image_translation.original_rgba_bytes,
+                            ),
+                            source_words: image_translation.source_words,
+                            translated_words: image_translation.translated_words,
+                        });
+                        // The text panes stay empty: the translation is read off the image
+                        // itself now, and selection covers copying it. Detection still runs, to
+                        // drive the detected-language card.
                         send_detection_to_ui(&image_translation.extracted_text, &ui);
-                        (ui.set_input_text)(image_translation.extracted_text);
-                        (ui.set_output_text)(image_translation.translated_text);
                         println!("image_ocr postprocess ui={:?}", ui_start.elapsed());
                     }
                     Err(message) => {
                         (ui.set_input_text)(String::new());
+                        (ui.set_image_error)(message.clone());
                         (ui.set_output_text)(message);
                     }
                 }
@@ -248,13 +275,6 @@ fn spawn_document_job(
 ) {
     thread::spawn(move || {
         let output_path = document_output_path(&app_paths.data, &input_path, &from, &to);
-        let available: Vec<translator::LanguageCode> = session
-            .language_overview()
-            .into_iter()
-            .filter(|entry| entry.availability.translator_files() || entry.language.is_english())
-            .map(|entry| translator::LanguageCode::from(entry.language.code))
-            .collect();
-
         let start = Instant::now();
         let progress_ui = ui.clone();
         let result = document::translate_document(
@@ -263,7 +283,6 @@ fn spawn_document_job(
             &output_path,
             &from,
             &to,
-            &available,
             translate_pdf_images,
             &cancel,
             &move |progress: DocumentProgress| {

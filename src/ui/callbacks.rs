@@ -3,8 +3,18 @@ use std::sync::Arc;
 
 use crate::document::DocumentEvent;
 use crate::model::{FeatureKind, Language};
+use translator::ocr::PositionedWord;
 
-use super::{AppBridge, TtsVoiceListItem};
+use super::{AppBridge, SelectionPillItem, TtsVoiceListItem};
+
+/// A finished image translation: both layers of pixels for the original/translated flip, and both
+/// layers of selectable words so the flip swaps the text under the finger along with the picture.
+pub struct ImageResult {
+    pub translated: QImage,
+    pub original: QImage,
+    pub source_words: Vec<PositionedWord>,
+    pub translated_words: Vec<PositionedWord>,
+}
 
 #[derive(Clone)]
 pub struct UiCallbacks {
@@ -14,7 +24,9 @@ pub struct UiCallbacks {
     pub set_output_text: Arc<dyn Fn(String) + Send + Sync>,
     pub set_tts_state: Arc<dyn Fn(bool, bool) + Send + Sync>,
     pub set_tts_voices: Arc<dyn Fn(bool, Vec<TtsVoiceListItem>, String, String) + Send + Sync>,
-    pub set_processed_image: Arc<dyn Fn(QImage) + Send + Sync>,
+    pub set_image_result: Arc<dyn Fn(ImageResult) + Send + Sync>,
+    pub set_detected_regions: Arc<dyn Fn(Vec<SelectionPillItem>) + Send + Sync>,
+    pub set_image_error: Arc<dyn Fn(String) + Send + Sync>,
     pub notify_live_frame: Arc<dyn Fn() + Send + Sync>,
     pub set_detected_language_code: Arc<dyn Fn(String) + Send + Sync>,
     pub set_document_event: Arc<dyn Fn(DocumentEvent) + Send + Sync>,
@@ -68,10 +80,24 @@ pub fn create_ui_callbacks(app: QPointer<AppBridge>) -> UiCallbacks {
             }
         });
 
-    let processed_image_app = app.clone();
-    let set_processed_image = queued_callback(move |image: QImage| {
-        if let Some(app) = processed_image_app.as_pinned() {
-            app.borrow_mut().set_processed_image_value(image);
+    let image_result_app = app.clone();
+    let set_image_result = queued_callback(move |result: ImageResult| {
+        if let Some(app) = image_result_app.as_pinned() {
+            app.borrow_mut().set_image_result_value(result);
+        }
+    });
+
+    let detected_app = app.clone();
+    let set_detected_regions = queued_callback(move |boxes: Vec<SelectionPillItem>| {
+        if let Some(app) = detected_app.as_pinned() {
+            app.borrow_mut().set_detected_regions_value(boxes);
+        }
+    });
+
+    let image_error_app = app.clone();
+    let set_image_error = queued_callback(move |message: String| {
+        if let Some(app) = image_error_app.as_pinned() {
+            app.borrow_mut().set_image_error_value(message);
         }
     });
 
@@ -109,7 +135,9 @@ pub fn create_ui_callbacks(app: QPointer<AppBridge>) -> UiCallbacks {
                 set_tts_voices((available, items, selected_name, selected_display_name))
             },
         ),
-        set_processed_image: Arc::new(set_processed_image),
+        set_image_result: Arc::new(set_image_result),
+        set_detected_regions: Arc::new(set_detected_regions),
+        set_image_error: Arc::new(set_image_error),
         notify_live_frame: Arc::new(move || bump_live_frame_tick(())),
         set_detected_language_code: Arc::new(set_detected_language_code),
         set_document_event: Arc::new(set_document_event),

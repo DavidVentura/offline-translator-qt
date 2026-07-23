@@ -644,6 +644,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "document-features"
+version = "0.2.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4b8a88685455ed29a21542a33abd9cb6510b6b129abadabdcef0f4c55bc8f61"
+dependencies = [
+ "litrs",
+]
+
+[[package]]
 name = "dwrote"
 version = "0.11.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -721,7 +730,7 @@ dependencies = [
 [[package]]
 name = "espeak-rs"
 version = "0.1.9"
-source = "git+https://github.com/DavidVentura/piper-rs#f3c5a393413349139a6546135f0384067490d5b6"
+source = "git+https://github.com/DavidVentura/piper-rs#32d666592234149ce65d2ee9c9ea776fe05b42f2"
 dependencies = [
  "espeak-rs-sys",
 ]
@@ -729,11 +738,23 @@ dependencies = [
 [[package]]
 name = "espeak-rs-sys"
 version = "0.1.9"
-source = "git+https://github.com/DavidVentura/piper-rs#f3c5a393413349139a6546135f0384067490d5b6"
+source = "git+https://github.com/DavidVentura/piper-rs#32d666592234149ce65d2ee9c9ea776fe05b42f2"
 dependencies = [
  "bindgen 0.69.5",
  "cmake",
  "glob",
+]
+
+[[package]]
+name = "fast_image_resize"
+version = "5.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fbc7fe45cf92b43817ff62a3723e862b85bd1d06288f63007f7645d1d2f7a060"
+dependencies = [
+ "cfg-if",
+ "document-features",
+ "num-traits",
+ "thiserror",
 ]
 
 [[package]]
@@ -1498,6 +1519,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92daf443525c4cce67b150400bc2316076100ce0b3686209eb8cf3c31612e6f0"
 
 [[package]]
+name = "litrs"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
+
+[[package]]
 name = "lock_api"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1638,7 +1665,7 @@ dependencies = [
 [[package]]
 name = "mnn-sys"
 version = "0.1.0"
-source = "git+https://github.com/DavidVentura/mnn-sys#01b736b9e27320bdea6ab0eab207d6a934f4a515"
+source = "git+https://github.com/DavidVentura/mnn-sys#6a797e687c0e3971bdcec0045994be8bc2c873e5"
 dependencies = [
  "bindgen 0.69.5",
  "cc",
@@ -2067,7 +2094,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 [[package]]
 name = "piper-rs"
 version = "0.1.9"
-source = "git+https://github.com/DavidVentura/piper-rs#f3c5a393413349139a6546135f0384067490d5b6"
+source = "git+https://github.com/DavidVentura/piper-rs#32d666592234149ce65d2ee9c9ea776fe05b42f2"
 dependencies = [
  "espeak-rs",
  "log",
@@ -2713,7 +2740,7 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 [[package]]
 name = "slimt-sys"
 version = "0.1.0"
-source = "git+https://github.com/DavidVentura/slimt-sys#0e97fc9024d1f5bc657095a7985971f71368d1a4"
+source = "git+https://github.com/DavidVentura/slimt-sys#f943950b97dd518b5562d2aa5c846e27ceeeb74f"
 dependencies = [
  "cmake",
 ]
@@ -3088,8 +3115,10 @@ dependencies = [
 name = "translator-raster"
 version = "0.1.0"
 dependencies = [
+ "fast_image_resize",
  "image",
  "log",
+ "rayon",
  "translator-core",
 ]
 
