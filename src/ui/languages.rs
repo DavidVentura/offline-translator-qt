@@ -79,6 +79,7 @@ impl AppBridge {
                 self.source_language_name = qname;
                 self.source_language_name_changed();
             }
+            #[cfg(feature = "live")]
             crate::live_ocr::set_live_languages(
                 &self.source_language_code,
                 &self.target_language_code,
@@ -110,6 +111,7 @@ impl AppBridge {
                 self.target_language_name = qname;
                 self.target_language_name_changed();
             }
+            #[cfg(feature = "live")]
             crate::live_ocr::set_live_languages(
                 &self.source_language_code,
                 &self.target_language_code,

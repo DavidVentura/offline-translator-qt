@@ -18,7 +18,9 @@ fn main() {
     // rendered_image_item.rs and live_camera_item.rs) are compiled.
     config.include(&qt_include_path).build("src/main.rs");
 
-    build_live_filter(&qt_include_path);
+    if std::env::var_os("CARGO_FEATURE_LIVE").is_some() {
+        build_live_filter(&qt_include_path);
+    }
 }
 
 // The QtMultimedia video filter needs Q_OBJECT, so it can't live in a `cpp!`

@@ -7,12 +7,23 @@ mod data;
 mod document;
 mod download;
 mod eventloop;
+#[cfg(unix)]
+mod fonts;
+#[cfg(not(unix))]
+#[path = "fonts_stub.rs"]
 mod fonts;
 mod image_ocr;
+#[cfg(feature = "live")]
 mod live_camera_item;
+#[cfg(feature = "live")]
 mod live_gpu;
+#[cfg(feature = "live")]
 mod live_ocr;
 mod model;
+#[cfg(unix)]
+mod pulse;
+#[cfg(not(unix))]
+#[path = "pulse_stub.rs"]
 mod pulse;
 mod rendered_image_item;
 mod settings;
@@ -40,6 +51,7 @@ cpp! {{
     #include <QtCore/QString>
 }}
 
+#[cfg(feature = "live")]
 unsafe extern "C" {
     fn register_live_ocr_filter();
 }
@@ -98,6 +110,7 @@ enum IoEvent {
     Shutdown,
 }
 
+#[cfg(unix)]
 fn get_app_paths() -> AppPaths {
     let home = std::env::var_os("HOME")
         .map(PathBuf::from)
@@ -115,6 +128,23 @@ fn get_app_paths() -> AppPaths {
     }
 }
 
+#[cfg(windows)]
+fn get_app_paths() -> AppPaths {
+    let local = std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(format!("C:/Users/{}/AppData/Local", whoami::username())));
+    let roaming = std::env::var_os("APPDATA")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            PathBuf::from(format!("C:/Users/{}/AppData/Roaming", whoami::username()))
+        });
+
+    AppPaths {
+        data: local.join(APP_NAME).display().to_string(),
+        config: roaming.join(APP_NAME).display().to_string(),
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::Builder::from_env(
         env_logger::Env::default().default_filter_or("info,translator=debug"),
@@ -122,6 +152,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     .init();
 
     let args: Vec<String> = std::env::args().collect();
+    #[cfg(feature = "live")]
     if let Some(pos) = args.iter().position(|a| a == "--bench-live") {
         let image = args.get(pos + 1).cloned().unwrap_or_default();
         let from = args
@@ -196,8 +227,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         0,
         c"RenderedImageItem",
     );
-    qml_register_type::<live_camera_item::LiveCameraItem>(c"TranslatorUi", 1, 0, c"LiveCameraItem");
-    unsafe { register_live_ocr_filter() };
+    #[cfg(feature = "live")]
+    {
+        qml_register_type::<live_camera_item::LiveCameraItem>(
+            c"TranslatorUi",
+            1,
+            0,
+            c"LiveCameraItem",
+        );
+        unsafe { register_live_ocr_filter() };
+    }
 
     let (bus_tx, bus_rx) = mpsc::channel::<IoEvent>();
     let app_paths = get_app_paths();
@@ -206,6 +245,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         catalog,
         app_paths.data.clone(),
     ));
+    #[cfg(feature = "live")]
     live_ocr::init_live_pipeline(Arc::clone(&session));
     let initial_languages = languages_from_overview(session.language_overview());
     let main_qml = find_main_qml()?;
@@ -225,6 +265,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     engine.set_object_property("app".into(), app.pinned());
 
     let ui_callbacks = create_ui_callbacks(QPointer::from(app.pinned().borrow()));
+    #[cfg(feature = "live")]
     live_ocr::set_live_frame_tick(ui_callbacks.notify_live_frame.clone());
     let session_for_loop = Arc::clone(&session);
     let jh = std::thread::spawn(move || {

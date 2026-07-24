@@ -499,11 +499,14 @@ pub struct AppBridge {
         fn open_live_camera(&mut self) {
             self.live_camera_open = true;
             self.live_camera_open_changed();
-            crate::live_ocr::set_live_languages(
-                &self.source_language_code,
-                &self.target_language_code,
-            );
-            crate::live_ocr::set_live_active(self.live_ocr_active);
+            #[cfg(feature = "live")]
+            {
+                crate::live_ocr::set_live_languages(
+                    &self.source_language_code,
+                    &self.target_language_code,
+                );
+                crate::live_ocr::set_live_active(self.live_ocr_active);
+            }
         }
     ),
     pub set_live_ocr_active: qt_method!(
@@ -512,6 +515,7 @@ pub struct AppBridge {
                 self.live_ocr_active = value;
                 self.live_ocr_active_changed();
             }
+            #[cfg(feature = "live")]
             crate::live_ocr::set_live_active(value);
         }
     ),
@@ -528,21 +532,29 @@ pub struct AppBridge {
             self.live_camera_open_changed();
             // Park the pipeline so the residual tracker/OCR state doesn't
             // chew on the last frame in the background.
+            #[cfg(feature = "live")]
             crate::live_ocr::set_live_active(false);
         }
     ),
     pub set_live_viewport: qt_method!(
         fn set_live_viewport(&self, width: i32, height: i32) {
+            #[cfg(feature = "live")]
             crate::live_ocr::set_live_viewport(width.max(0) as u32, height.max(0) as u32);
+            #[cfg(not(feature = "live"))]
+            let _ = (width, height);
         }
     ),
     pub set_camera_orientation: qt_method!(
         fn set_camera_orientation(&self, degrees: i32) {
+            #[cfg(feature = "live")]
             crate::live_gpu::set_camera_orientation_degrees(degrees);
+            #[cfg(not(feature = "live"))]
+            let _ = degrees;
         }
     ),
     pub request_live_acquire: qt_method!(
         fn request_live_acquire(&self) {
+            #[cfg(feature = "live")]
             crate::live_ocr::request_acquire();
         }
     ),
