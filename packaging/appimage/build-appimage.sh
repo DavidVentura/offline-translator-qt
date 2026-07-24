@@ -7,6 +7,14 @@ repo_root="$(cd "$script_dir/../.." && pwd)"
 app_id="dev.davidv.translator"
 app_name="offline-translator-linux"
 
+# zsync delta updates: appimagetool embeds this string in the AppImage and emits
+# a matching .zsync file, so appimageupdatetool only pulls the changed blocks on
+# upgrade. The tag "latest" resolves to the newest GitHub release, and the glob
+# lets one build's update info match every future version's asset name.
+gh_owner="${APPIMAGE_GH_OWNER:-DavidVentura}"
+gh_repo="${APPIMAGE_GH_REPO:-offline-translator-linux}"
+gh_tag="${APPIMAGE_GH_TAG:-latest}"
+
 host_arch="$(uname -m)"
 case "${APPIMAGE_ARCH:-$host_arch}" in
   x86_64|amd64)
@@ -97,7 +105,7 @@ gst_wanted=(
 
 version="$(sed -n 's/^version = "\(.*\)"$/\1/p' "$repo_root/Cargo.toml" | head -1)"
 
-tools_dir="$script_dir/tools"
+tools_dir="$script_dir/tools/$arch"
 mkdir -p "$tools_dir"
 
 fetch_tool() {
@@ -107,6 +115,14 @@ fetch_tool() {
     echo "Fetching $(basename "$dest")" >&2
     curl -fsSL -o "$dest" "$url"
     chmod +x "$dest"
+    # binfmt_misc matches an ELF header including the padding at offset 8, where
+    # AppImages stamp their "AI\x02" magic — so under qemu-user emulation the
+    # kernel finds no interpreter for these tools and execve fails outright.
+    # The runtime locates its squashfs through the section headers, so dropping
+    # the magic costs nothing here.
+    case "$dest" in
+      *.AppImage) printf '\0\0\0' | dd of="$dest" bs=1 seek=8 conv=notrunc status=none ;;
+    esac
   fi
   printf '%s\n' "$dest"
 }
@@ -210,6 +226,22 @@ cd "$out_dir"
   --plugin qt \
   --plugin gstreamer
 
+# EXTRA_QT_PLUGINS does not reach the sensor backends, so Main.qml's
+# OrientationSensor would bind to a QtSensors with no backend behind it and
+# never produce a reading. Deploy them the way the gstreamer plugin deploys
+# its own: copy, let linuxdeploy pull the dependencies, then fix the rpaths.
+qt_plugin_dir="$("$QMAKE" -query QT_INSTALL_PLUGINS)"
+if [ ! -d "$qt_plugin_dir/sensors" ]; then
+  echo "Qt sensor plugins not found in $qt_plugin_dir/sensors" >&2
+  exit 1
+fi
+mkdir -p "$appdir/usr/plugins/sensors"
+cp "$qt_plugin_dir"/sensors/*.so "$appdir/usr/plugins/sensors/"
+"$linuxdeploy" --appdir "$appdir"
+for plugin in "$appdir"/usr/plugins/sensors/*.so; do
+  patchelf --set-rpath '$ORIGIN/../../lib:$ORIGIN' "$plugin"
+done
+
 # The qt plugin deploys whatever the build host has installed: on a Plasma
 # desktop that means KDE's kimageformats plugins (avif, jxl, exr) and the
 # org.kde.desktop Quick Controls style with its KF5 stack. The app only ever
@@ -250,6 +282,9 @@ prune_orphan_libs() {
 }
 prune_orphan_libs
 
+export LDAI_UPDATE_INFORMATION="gh-releases-zsync|$gh_owner|$gh_repo|$gh_tag|Offline_translator-*-$arch.AppImage.zsync"
 "$plugin_appimage" --appdir "$appdir"
 
 echo "Built $out_dir/$OUTPUT"
+echo "Update info: $LDAI_UPDATE_INFORMATION"
+[ -f "$out_dir/$OUTPUT.zsync" ] && echo "Delta file: $out_dir/$OUTPUT.zsync"
