@@ -8,6 +8,7 @@ mod transliteration;
 mod tts;
 mod types;
 
+pub(crate) use self::core::UiScale;
 pub use callbacks::{ImageResult, UiCallbacks, create_ui_callbacks};
 pub use types::{
     DictionaryPopupRowItem, LanguageListItem, ManageLanguageListItem, ManageTtsVoicePackListItem,
@@ -192,6 +193,7 @@ pub struct AppBridge {
     ),
 
     pub desktop_mode: qt_property!(bool; CONST),
+    pub ui_scale: qt_property!(f64; CONST),
     pub automation_enabled: qt_property!(bool; CONST),
     pub automation_from: qt_property!(QString; CONST),
     pub automation_to: qt_property!(QString; CONST),

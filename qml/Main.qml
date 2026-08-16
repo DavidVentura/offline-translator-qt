@@ -7,12 +7,13 @@ ApplicationWindow {
     id: root
     visible: true
     visibility: app.desktop_mode ? Window.Windowed : Window.Maximized
-    width: app.desktop_mode ? 600 : 720
-    height: app.desktop_mode ? 1024 : 1280
-    minimumWidth: app.desktop_mode ? 600 : 360
-    minimumHeight: app.desktop_mode ? 1024 : 640
+    width: app.desktop_mode ? Math.min(ui.dp(600), Screen.desktopAvailableWidth) : 720
+    height: app.desktop_mode ? Math.min(ui.dp(1024), Screen.desktopAvailableHeight) : 1280
+    minimumWidth: app.desktop_mode ? ui.dp(360) : 360
+    minimumHeight: app.desktop_mode ? ui.dp(480) : 640
     title: "Offline Translator"
 
+    UiScale { id: ui }
     AppTheme { id: theme }
     color: theme.backgroundColor
 

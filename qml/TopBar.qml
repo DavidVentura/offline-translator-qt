@@ -6,7 +6,7 @@ ToolBar {
     id: topBarRoot
     property var appBridge
     property var theme
-    UiScale { id: ui; desktopMode: topBarRoot.appBridge && topBarRoot.appBridge.desktop_mode }
+    UiScale { id: ui }
     implicitHeight: ui.dp(56)
 
     function syncComboBox(comboBox, value) {
@@ -56,7 +56,6 @@ ToolBar {
             Layout.fillWidth: true
             Layout.preferredWidth: 1
             Layout.fillHeight: true
-            desktopMode: topBarRoot.appBridge.desktop_mode
             theme: topBarRoot.theme
             iconSource: appBridge.asset_url("expand_more.svg")
             model: appBridge.installed_from_language_names
@@ -77,7 +76,6 @@ ToolBar {
             Layout.fillWidth: true
             Layout.preferredWidth: 1
             Layout.fillHeight: true
-            desktopMode: topBarRoot.appBridge.desktop_mode
             theme: topBarRoot.theme
             iconSource: appBridge.asset_url("expand_more.svg")
             model: appBridge.installed_to_language_names

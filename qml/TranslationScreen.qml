@@ -7,7 +7,7 @@ Item {
     property var appBridge
     property var theme
     property bool speechLongPressTriggered: false
-    UiScale { id: ui; desktopMode: root.appBridge && root.appBridge.desktop_mode }
+    UiScale { id: ui }
     readonly property real clipboardButtonSize: ui.dp(24)
     readonly property real clipboardIconSize: ui.dp(22)
     readonly property bool imageSelectionMode: appBridge.image_mode
@@ -138,7 +138,7 @@ Item {
                         bottomPadding: 0
                         text: appBridge.input_text
                         color: theme.textPrimary
-                        font.pointSize: ui.pt(16)
+                        font.pixelSize: ui.dp(21)
                         wrapMode: TextEdit.Wrap
                         verticalAlignment: TextEdit.AlignTop
                         activeFocusOnPress: true
@@ -161,7 +161,7 @@ Item {
                         text: appBridge.input_transliteration
                         wrapMode: Text.Wrap
                         color: theme.textSecondary
-                        font.pointSize: ui.pt(13)
+                        font.pixelSize: ui.dp(17)
                     }
                 }
 
@@ -350,13 +350,13 @@ Item {
                 Label {
                     text: "Translate from"
                     color: theme.textSecondary
-                    font.pointSize: ui.pt(13)
+                    font.pixelSize: ui.dp(17)
                 }
 
                 Label {
                     text: appBridge.detected_language_name
                     color: theme.textPrimary
-                    font.pointSize: ui.pt(16)
+                    font.pixelSize: ui.dp(21)
                     font.bold: true
                 }
             }
@@ -455,7 +455,7 @@ Item {
                             activeFocusOnPress: appBridge.desktop_mode
                             selectByMouse: appBridge.desktop_mode
                             color: theme.textPrimary
-                            font.pointSize: ui.pt(16)
+                            font.pixelSize: ui.dp(21)
                             background: Item {}
                         }
 
@@ -499,7 +499,7 @@ Item {
                             text: appBridge.output_transliteration
                             wrapMode: Text.Wrap
                             color: theme.textSecondary
-                            font.pointSize: ui.pt(13)
+                            font.pixelSize: ui.dp(17)
                         }
                     }
                 }
@@ -597,7 +597,7 @@ Item {
                         Label {
                             text: "Playback speed"
                             color: theme.textPrimary
-                            font.pointSize: ui.pt(16)
+                            font.pixelSize: ui.dp(21)
                             font.bold: true
                         }
 
@@ -615,7 +615,7 @@ Item {
                                     anchors.centerIn: parent
                                     text: "-"
                                     color: theme.textPrimary
-                                    font.pointSize: ui.pt(18)
+                                    font.pixelSize: ui.dp(24)
                                 }
 
                                 MouseArea {
@@ -630,7 +630,7 @@ Item {
                                 verticalAlignment: Text.AlignVCenter
                                 text: appBridge.tts_playback_speed.toFixed(2) + "x"
                                 color: theme.textPrimary
-                                font.pointSize: ui.pt(16)
+                                font.pixelSize: ui.dp(21)
                             }
 
                             Rectangle {
@@ -643,7 +643,7 @@ Item {
                                     anchors.centerIn: parent
                                     text: "+"
                                     color: theme.textPrimary
-                                    font.pointSize: ui.pt(18)
+                                    font.pixelSize: ui.dp(24)
                                 }
 
                                 MouseArea {
@@ -663,7 +663,7 @@ Item {
                         Label {
                             text: "Voice"
                             color: theme.textPrimary
-                            font.pointSize: ui.pt(16)
+                            font.pixelSize: ui.dp(21)
                             font.bold: true
                         }
 
@@ -689,7 +689,7 @@ Item {
                                     color: theme.textPrimary
                                     verticalAlignment: Text.AlignVCenter
                                     elide: Text.ElideRight
-                                    font.pointSize: ui.pt(15)
+                                    font.pixelSize: ui.dp(20)
                                 }
 
                                 Image {
@@ -873,7 +873,6 @@ Item {
                 width: parent.width
                 label: "Translate images in PDF"
                 theme: root.theme
-                desktopMode: appBridge.desktop_mode
                 checked: appBridge.doc_translate_images
                 onToggled: appBridge.doc_translate_images = checked
             }
@@ -1191,7 +1190,7 @@ Item {
             color: theme.textPrimary
             wrapMode: Text.Wrap
             horizontalAlignment: Text.AlignHCenter
-            font.pointSize: ui.pt(14)
+            font.pixelSize: ui.dp(19)
         }
 
         MouseArea {

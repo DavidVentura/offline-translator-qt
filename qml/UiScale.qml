@@ -1,25 +1,21 @@
 import QtQuick 2.15
-import QtQuick.Window 2.15
 
 Item {
     id: root
     visible: false
     width: 0
     height: 0
-    property bool desktopMode: false
 
-    readonly property real dpiScale: Math.max(1.0, Screen.pixelDensity / (160 / 25.4))
-    readonly property real textScale: desktopMode ? 1.0 : 1.6
-    readonly property real pageTitlePt: desktopMode ? 20 : pt(24)
-    readonly property real listPrimaryPt: desktopMode ? 14 : pt(16)
-    readonly property real listSecondaryPt: desktopMode ? 11 : pt(12)
-    readonly property real sectionTitlePt: desktopMode ? 13 : pt(14)
+    // Device pixels per grid unit / 8, resolved once in Rust: the shell's GRID_UNIT_PX on Ubuntu
+    // Touch, 1.0 everywhere else (where Qt's own high-DPI scaling has already been applied).
+    readonly property real scaleFactor: app.ui_scale
+
+    readonly property real pageTitlePx: dp(27)
+    readonly property real listPrimaryPx: dp(19)
+    readonly property real listSecondaryPx: dp(15)
+    readonly property real sectionTitlePx: dp(17)
 
     function dp(value) {
-        return value * dpiScale
-    }
-
-    function pt(value) {
-        return value * textScale
+        return value * scaleFactor
     }
 }

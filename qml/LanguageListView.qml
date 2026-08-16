@@ -8,9 +8,8 @@ ScrollView {
     property var theme
     property var installedModel
     property var availableModel
-    property bool desktopMode: false
     clip: true
-    UiScale { id: ui; desktopMode: root.desktopMode }
+    UiScale { id: ui }
 
     ColumnLayout {
         width: parent.width
@@ -20,7 +19,7 @@ ScrollView {
             visible: installedModel.rowCount() > 0
             text: "Installed"
             color: theme.textPrimary
-            font.pointSize: ui.pt(18)
+            font.pixelSize: ui.dp(24)
         }
 
         Repeater {
@@ -35,7 +34,6 @@ ScrollView {
 
                 appBridge: parent.parent.parent.parent.appBridge
                 theme: parent.parent.parent.parent.theme
-                desktopMode: parent.parent.parent.parent.desktopMode
                 installed: true
             }
         }
@@ -44,7 +42,7 @@ ScrollView {
             visible: availableModel.rowCount() > 0
             text: "Available"
             color: theme.textPrimary
-            font.pointSize: ui.pt(18)
+            font.pixelSize: ui.dp(24)
         }
 
         Repeater {
@@ -58,7 +56,6 @@ ScrollView {
 
                 appBridge: parent.parent.parent.parent.appBridge
                 theme: parent.parent.parent.parent.theme
-                desktopMode: parent.parent.parent.parent.desktopMode
             }
         }
     }

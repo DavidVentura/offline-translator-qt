@@ -6,7 +6,7 @@ Item {
     id: root
     property var appBridge
     property var theme
-    UiScale { id: ui; desktopMode: root.appBridge && root.appBridge.desktop_mode }
+    UiScale { id: ui }
 
     ColumnLayout {
         anchors.fill: parent
@@ -27,7 +27,6 @@ Item {
             Layout.leftMargin: ui.dp(12)
             Layout.rightMargin: ui.dp(12)
             appBridge: root.appBridge
-            desktopMode: root.appBridge.desktop_mode
             theme: root.theme
         }
     }

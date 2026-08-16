@@ -9,7 +9,7 @@ Item {
     required property string title
     signal backRequested()
 
-    UiScale { id: ui; desktopMode: root.appBridge && root.appBridge.desktop_mode }
+    UiScale { id: ui }
 
     implicitHeight: ui.dp(56)
 
@@ -36,7 +36,7 @@ Item {
             Layout.alignment: Qt.AlignVCenter
             text: root.title
             color: theme.textPrimary
-            font.pointSize: ui.pageTitlePt
+            font.pixelSize: ui.pageTitlePx
             font.bold: true
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight

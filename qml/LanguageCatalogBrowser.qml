@@ -5,9 +5,8 @@ import QtQuick.Layouts 1.15
 Item {
     property var appBridge
     property var theme
-    property bool desktopMode: false
 
-    UiScale { id: ui; desktopMode: appBridge ? appBridge.desktop_mode : desktopMode }
+    UiScale { id: ui }
     function actionIcon(installed) {
         return installed ? appBridge.asset_url("delete.svg") : appBridge.asset_url("download.svg")
     }
@@ -82,7 +81,7 @@ Item {
                 Layout.rightMargin: ui.dp(20)
                 text: "Pick a voice"
                 color: "white"
-                font.pointSize: ui.pt(22)
+                font.pixelSize: ui.dp(29)
                 font.bold: true
             }
 
@@ -102,7 +101,7 @@ Item {
                     width: ListView.view.width
                     text: section
                     color: "#E4E6F2"
-                    font.pointSize: ui.pt(14)
+                    font.pixelSize: ui.dp(19)
                     font.bold: true
                     leftPadding: ui.dp(4)
                     topPadding: ui.dp(8)
@@ -131,7 +130,7 @@ Item {
                             width: parent.width
                             text: voice_display_name
                             color: installed ? "#8A8E9F" : "#F1F3FB"
-                            font.pointSize: ui.pt(16)
+                            font.pixelSize: ui.dp(21)
                             elide: Text.ElideRight
                         }
 
@@ -139,7 +138,7 @@ Item {
                             width: parent.width
                             text: size_text
                             color: "#A9ADBC"
-                            font.pointSize: ui.pt(13)
+                            font.pixelSize: ui.dp(17)
                             horizontalAlignment: Text.AlignLeft
                             elide: Text.ElideRight
                         }
@@ -158,7 +157,7 @@ Item {
                             visible: installed
                             text: "Installed"
                             color: "#8A8E9F"
-                            font.pointSize: ui.pt(12)
+                            font.pixelSize: ui.dp(16)
                         }
 
                         Image {
@@ -195,7 +194,7 @@ Item {
                     contentItem: Text {
                         text: parent.text
                         color: theme.accentColor
-                        font.pointSize: ui.pt(16)
+                        font.pixelSize: ui.dp(21)
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -216,7 +215,7 @@ Item {
             text: appBridge.manage_filter_text
             color: theme.textPrimary
             placeholderTextColor: theme.textSecondary
-            font.pointSize: ui.pt(14)
+            font.pixelSize: ui.dp(19)
             onTextChanged: appBridge.set_manage_filter(text)
 
             background: Rectangle {
@@ -309,7 +308,7 @@ Item {
                                 text: name
                                 width: parent.width
                                 color: theme.textPrimary
-                                font.pointSize: ui.listPrimaryPt
+                                font.pixelSize: ui.listPrimaryPx
                                 font.bold: true
                                 elide: Text.ElideRight
                             }
@@ -318,7 +317,7 @@ Item {
                                 text: total_size
                                 width: parent.width
                                 color: theme.textSecondary
-                                font.pointSize: ui.listSecondaryPt
+                                font.pixelSize: ui.listSecondaryPx
                                 horizontalAlignment: Text.AlignLeft
                             }
                         }
@@ -424,7 +423,7 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: "Translation"
                                 color: theme.textPrimary
-                                font.pointSize: ui.sectionTitlePt
+                                font.pixelSize: ui.sectionTitlePx
                             }
 
                             Label {
@@ -433,7 +432,7 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: core_size
                                 color: theme.textSecondary
-                                font.pointSize: ui.listSecondaryPt
+                                font.pixelSize: ui.listSecondaryPx
                                 horizontalAlignment: Text.AlignLeft
                             }
 
@@ -479,7 +478,7 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: "Dictionary"
                                 color: theme.textPrimary
-                                font.pointSize: ui.sectionTitlePt
+                                font.pixelSize: ui.sectionTitlePx
                             }
 
                             Label {
@@ -488,7 +487,7 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: dictionary_size
                                 color: theme.textSecondary
-                                font.pointSize: ui.listSecondaryPt
+                                font.pixelSize: ui.listSecondaryPx
                                 horizontalAlignment: Text.AlignLeft
                             }
 
@@ -532,7 +531,7 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: "Text-to-speech"
                                 color: theme.textPrimary
-                                font.pointSize: ui.sectionTitlePt
+                                font.pixelSize: ui.sectionTitlePx
                             }
 
                             Label {
@@ -541,7 +540,7 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: tts_size
                                 color: theme.textSecondary
-                                font.pointSize: ui.listSecondaryPt
+                                font.pixelSize: ui.listSecondaryPx
                                 horizontalAlignment: Text.AlignLeft
                             }
 

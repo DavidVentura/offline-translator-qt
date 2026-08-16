@@ -39,6 +39,54 @@ impl Platform {
     }
 }
 
+/// Where the UI's density comes from. Every `dp()` value in the QML is authored against the 8px
+/// grid unit, so the factor below is what turns those into device pixels.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub(crate) enum UiScale {
+    /// Lomiri publishes the device's grid unit in `GRID_UNIT_PX`, read from
+    /// `/etc/ubuntu-touch-session.d/<device>.conf`. On Ubuntu Touch it is the only density signal
+    /// worth trusting: ports such as the Fairphone 5 report a panel DPI that is far too low, and
+    /// anything derived from `Screen.pixelDensity` inherits that mistake.
+    ShellGridUnit(f64),
+    /// Nothing published a density, so Qt's own high-DPI handling owns the screen scaling and QML
+    /// keeps working in logical pixels.
+    QtManaged,
+}
+
+const BASELINE_GRID_UNIT_PX: f64 = 8.0;
+
+impl UiScale {
+    pub(crate) fn detect() -> Self {
+        let Some(raw) = std::env::var_os("GRID_UNIT_PX") else {
+            return UiScale::QtManaged;
+        };
+        let grid_unit = raw
+            .to_str()
+            .and_then(|value| value.trim().parse::<f64>().ok())
+            .filter(|px| px.is_finite() && *px > 0.0);
+        match grid_unit {
+            Some(px) => UiScale::ShellGridUnit(px),
+            None => {
+                eprintln!("ui.scale: ignoring unusable GRID_UNIT_PX={raw:?}");
+                UiScale::QtManaged
+            }
+        }
+    }
+
+    pub(crate) fn factor(self) -> f64 {
+        match self {
+            UiScale::ShellGridUnit(px) => px / BASELINE_GRID_UNIT_PX,
+            UiScale::QtManaged => 1.0,
+        }
+    }
+
+    /// Qt has to be told about high-DPI scaling before its application object exists, and only
+    /// when the shell did not already hand us a factor — doing both would scale the UI twice.
+    pub(crate) fn qt_owns_scaling(self) -> bool {
+        matches!(self, UiScale::QtManaged)
+    }
+}
+
 impl AppBridge {
     pub fn new(
         languages: Vec<Language>,
@@ -48,6 +96,7 @@ impl AppBridge {
         data_dir: String,
         settings: Settings,
         session: Arc<TranslatorSession>,
+        ui_scale: UiScale,
     ) -> Self {
         let current_screen = std::env::var("START_SCREEN")
             .ok()
@@ -55,12 +104,14 @@ impl AppBridge {
             .and_then(|s| s.parse::<i32>().ok())
             .unwrap_or(Screen::NoLanguages.as_i32());
         let desktop_mode = Platform::detect().is_desktop();
+        eprintln!("ui.scale: {ui_scale:?} factor={}", ui_scale.factor());
         let mut app = AppBridge {
             current_screen,
             bus_tx: Some(bus_tx),
             session: Some(session),
             previous_screen: Screen::Translation,
             desktop_mode,
+            ui_scale: ui_scale.factor(),
             doc_translate_images: true,
             ..Default::default()
         };

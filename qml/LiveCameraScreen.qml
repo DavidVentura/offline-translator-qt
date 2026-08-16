@@ -10,7 +10,7 @@ Item {
     property var appBridge
     property var theme
 
-    UiScale { id: ui; desktopMode: appBridge.desktop_mode }
+    UiScale { id: ui }
 
     // Set while a still capture is in flight, to dim the shutter and block
     // re-entry until the image is saved (or fails).
@@ -229,7 +229,6 @@ Item {
             Layout.fillWidth: true
             Layout.preferredWidth: 1
             Layout.fillHeight: true
-            desktopMode: appBridge.desktop_mode
             theme: root.theme
             iconSource: appBridge.asset_url("expand_more.svg")
             model: appBridge.installed_from_language_names
@@ -250,7 +249,6 @@ Item {
             Layout.fillWidth: true
             Layout.preferredWidth: 1
             Layout.fillHeight: true
-            desktopMode: appBridge.desktop_mode
             theme: root.theme
             iconSource: appBridge.asset_url("expand_more.svg")
             model: appBridge.installed_to_language_names

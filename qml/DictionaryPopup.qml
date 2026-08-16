@@ -7,7 +7,7 @@ Item {
     required property var appBridge
     required property var theme
 
-    UiScale { id: ui; desktopMode: root.appBridge && root.appBridge.desktop_mode }
+    UiScale { id: ui }
 
     visible: opacity > 0 || appBridge.dictionary_popup_open
     opacity: appBridge.dictionary_popup_open ? 1 : 0
@@ -72,7 +72,7 @@ Item {
                     Layout.fillWidth: true
                     text: appBridge.dictionary_popup_word
                     color: theme.textPrimary
-                    font.pointSize: ui.pt(24)
+                    font.pixelSize: ui.dp(32)
                     font.bold: true
                     elide: Text.ElideRight
                 }
@@ -84,7 +84,7 @@ Item {
                     Label {
                         text: appBridge.dictionary_popup_primary_label
                         color: appBridge.dictionary_popup_selected_entry_index === 0 ? theme.textPrimary : theme.textSecondary
-                        font.pointSize: ui.pt(16)
+                        font.pixelSize: ui.dp(21)
                         font.bold: appBridge.dictionary_popup_selected_entry_index === 0
 
                         MouseArea {
@@ -96,13 +96,13 @@ Item {
                     Label {
                         text: "|"
                         color: theme.textSecondary
-                        font.pointSize: ui.pt(16)
+                        font.pixelSize: ui.dp(21)
                     }
 
                     Label {
                         text: appBridge.dictionary_popup_secondary_label
                         color: appBridge.dictionary_popup_selected_entry_index === 1 ? theme.textPrimary : theme.textSecondary
-                        font.pointSize: ui.pt(16)
+                        font.pixelSize: ui.dp(21)
                         font.bold: appBridge.dictionary_popup_selected_entry_index === 1
 
                         MouseArea {
@@ -120,7 +120,7 @@ Item {
                 text: appBridge.dictionary_popup_subtitle
                 color: theme.textPrimary
                 opacity: 0.9
-                font.pointSize: ui.pt(15)
+                font.pixelSize: ui.dp(20)
                 wrapMode: Text.Wrap
             }
 
@@ -152,7 +152,7 @@ Item {
                                 anchors.right: parent.right
                                 text: kind === "gloss" ? "• " + parent.text : parent.text
                                 color: theme.textPrimary
-                                font.pointSize: kind === "pos" ? ui.pt(18) : ui.pt(15)
+                                font.pixelSize: kind === "pos" ? ui.dp(24) : ui.dp(20)
                                 font.bold: kind === "pos"
                                 wrapMode: Text.Wrap
                             }

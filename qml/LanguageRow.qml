@@ -3,7 +3,7 @@ import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 
 Rectangle {
-    UiScale { id: ui; desktopMode: root.desktopMode }
+    UiScale { id: ui }
     id: root
     required property string code
     required property string name
@@ -13,7 +13,6 @@ Rectangle {
     property bool installed: false
     property var appBridge
     property var theme
-    property bool desktopMode: false
 
     Layout.fillWidth: true
     color: theme.surfaceColor
@@ -32,13 +31,13 @@ Rectangle {
             Label {
                 text: parent.parent.name
                 color: parent.parent.parent.theme.textPrimary
-                font.pointSize: ui.pt(16)
+                font.pixelSize: ui.dp(21)
             }
 
             Label {
                 text: parent.parent.parent.built_in ? "Built in" : parent.parent.parent.size
                 color: parent.parent.parent.theme.textSecondary
-                font.pointSize: ui.pt(13)
+                font.pixelSize: ui.dp(17)
             }
         }
 

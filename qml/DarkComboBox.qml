@@ -5,7 +5,6 @@ ComboBox {
     id: control
     property var theme
     property string iconSource
-    property bool desktopMode: false
     leftInset: 0
     rightInset: 0
     topInset: 0
@@ -14,7 +13,7 @@ ComboBox {
     rightPadding: 0
     topPadding: 0
     bottomPadding: 0
-    UiScale { id: ui; desktopMode: control.desktopMode }
+    UiScale { id: ui }
 
     contentItem: Label {
         leftPadding: ui.dp(6)
@@ -23,7 +22,7 @@ ComboBox {
         color: theme.textPrimary
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
-        font.pointSize: ui.pt(15)
+        font.pixelSize: ui.dp(20)
     }
 
     background: Rectangle {
@@ -62,7 +61,7 @@ ComboBox {
                     text: modelData
                     color: theme.textPrimary
                     verticalAlignment: Text.AlignVCenter
-                    font.pointSize: ui.pt(15)
+                    font.pixelSize: ui.dp(20)
                 }
 
                 MouseArea {

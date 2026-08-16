@@ -3,11 +3,10 @@ import QtQuick.Controls 2.15
 
 Item {
     id: control
-    UiScale { id: ui; desktopMode: control.desktopMode }
+    UiScale { id: ui }
     property string label
     property bool checked
     property var theme
-    property bool desktopMode: false
     signal toggled(bool checked)
 
     implicitHeight: ui.dp(36)
@@ -19,7 +18,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         text: control.label
         color: theme.textPrimary
-        font.pointSize: ui.pt(15)
+        font.pixelSize: ui.dp(20)
         wrapMode: Text.WordWrap
     }
 

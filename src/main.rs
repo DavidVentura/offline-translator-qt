@@ -210,6 +210,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     qmetaobject::log::init_qt_to_rust();
 
+    let ui_scale = ui::UiScale::detect();
+    if ui_scale.qt_owns_scaling() {
+        cpp!(unsafe [] {
+            QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+        });
+    }
+
     // QSettings refuses to guess a file path without these, so every QSettings
     // in this process — ours and the ones qtubuntu-camera opens for us — would
     // otherwise be a no-op. The organization doubles as the config directory
@@ -260,6 +267,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         app_paths.data.clone(),
         settings,
         Arc::clone(&session),
+        ui_scale,
     ));
 
     engine.set_object_property("app".into(), app.pinned());
