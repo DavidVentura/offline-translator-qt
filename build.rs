@@ -18,8 +18,41 @@ fn main() {
     // rendered_image_item.rs and live_camera_item.rs) are compiled.
     config.include(&qt_include_path).build("src/main.rs");
 
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
+        build_uri_handler(&qt_include_path);
+    }
     if std::env::var_os("CARGO_FEATURE_LIVE").is_some() {
         build_live_filter(&qt_include_path);
+    }
+}
+
+// Same story as the video filter: the D-Bus object exporting
+// org.freedesktop.Application.Open needs Q_OBJECT, so it is its own TU.
+fn build_uri_handler(qt_include_path: &str) {
+    println!("cargo:rerun-if-changed=cpp/uri_handler.cpp");
+    println!("cargo:rerun-if-changed=cpp/uri_handler.h");
+
+    let moc_out = run_moc(qt_include_path, "cpp/uri_handler.h", "moc_uri_handler.cpp");
+    let mut build = cc::Build::new();
+    build.cpp(true);
+    if let Ok(flags) = std::env::var("DEP_QT_COMPILE_FLAGS") {
+        for flag in flags.split_terminator(';') {
+            build.flag(flag);
+        }
+    }
+    build
+        .flag_if_supported("-std=c++17")
+        .include(qt_include_path)
+        .include(format!("{qt_include_path}/QtCore"))
+        .include(format!("{qt_include_path}/QtDBus"))
+        .include("cpp")
+        .file("cpp/uri_handler.cpp")
+        .file(&moc_out)
+        .compile("uri_handler");
+
+    println!("cargo:rustc-link-lib=Qt5DBus");
+    if let Ok(lib_path) = std::env::var("QT_LIBRARY_PATH") {
+        println!("cargo:rustc-link-search=native={lib_path}");
     }
 }
 
@@ -30,21 +63,7 @@ fn build_live_filter(qt_include_path: &str) {
     println!("cargo:rerun-if-changed=cpp/live_filter.cpp");
     println!("cargo:rerun-if-changed=cpp/live_filter.h");
 
-    let out_dir = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR missing"));
-    let moc = find_moc();
-    let moc_out = out_dir.join("moc_live_filter.cpp");
-    let moc_status = Command::new(&moc)
-        .arg("-I")
-        .arg(qt_include_path)
-        .arg("cpp/live_filter.h")
-        .arg("-o")
-        .arg(&moc_out)
-        .status()
-        .expect("failed to launch moc");
-    if !moc_status.success() {
-        panic!("moc failed on cpp/live_filter.h (moc={moc})");
-    }
-
+    let moc_out = run_moc(qt_include_path, "cpp/live_filter.h", "moc_live_filter.cpp");
     let mut build = cc::Build::new();
     build.cpp(true);
     if let Ok(flags) = std::env::var("DEP_QT_COMPILE_FLAGS") {
@@ -67,6 +86,24 @@ fn build_live_filter(qt_include_path: &str) {
     if let Ok(lib_path) = std::env::var("QT_LIBRARY_PATH") {
         println!("cargo:rustc-link-search=native={lib_path}");
     }
+}
+
+fn run_moc(qt_include_path: &str, header: &str, output_name: &str) -> PathBuf {
+    let out_dir = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR missing"));
+    let moc = find_moc();
+    let moc_out = out_dir.join(output_name);
+    let moc_status = Command::new(&moc)
+        .arg("-I")
+        .arg(qt_include_path)
+        .arg(header)
+        .arg("-o")
+        .arg(&moc_out)
+        .status()
+        .expect("failed to launch moc");
+    if !moc_status.success() {
+        panic!("moc failed on {header} (moc={moc})");
+    }
+    moc_out
 }
 
 fn find_moc() -> String {

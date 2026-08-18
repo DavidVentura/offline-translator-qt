@@ -29,6 +29,7 @@ mod rendered_image_item;
 mod settings;
 mod tts;
 mod ui;
+mod uri_handler;
 
 use cpp::cpp;
 use qmetaobject::*;
@@ -43,6 +44,7 @@ use crate::catalog_state::{bundled_catalog, languages_from_overview};
 use crate::model::FeatureKind;
 use crate::settings::load_settings;
 use crate::ui::{AppBridge, create_ui_callbacks};
+use crate::uri_handler::LaunchIntent;
 
 const APP_NAME: &str = "dev.davidv.translator";
 
@@ -272,6 +274,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     engine.set_object_property("app".into(), app.pinned());
 
+    let uri_app = QPointer::from(app.pinned().borrow());
+    let deliver_intent = queued_callback(move |intent: LaunchIntent| {
+        if let Some(app) = uri_app.as_pinned() {
+            app.borrow_mut().apply_launch_intent(intent);
+        }
+    });
+    uri_handler::install(deliver_intent);
+
     let ui_callbacks = create_ui_callbacks(QPointer::from(app.pinned().borrow()));
     #[cfg(feature = "live")]
     live_ocr::set_live_frame_tick(ui_callbacks.notify_live_frame.clone());
@@ -281,6 +291,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     bus_tx.send(IoEvent::SetAppPaths(app_paths)).unwrap();
+    if let Some(intent) = uri_handler::intent_from_args(&args) {
+        app.pinned().borrow_mut().defer_launch_intent(intent);
+    }
     engine.load_file(main_qml.into());
     engine.exec();
 

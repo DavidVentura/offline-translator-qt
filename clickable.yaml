@@ -23,4 +23,5 @@ install_root_data:
 - packaging/ubuntu-touch/translator.apparmor
 - packaging/ubuntu-touch/translator-contenthub.json
 - packaging/ubuntu-touch/translator.desktop
+- packaging/ubuntu-touch/translator.url-dispatcher
 - assets

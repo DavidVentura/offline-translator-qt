@@ -7,7 +7,8 @@
         "translator": {
             "apparmor": "translator.apparmor",
             "content-hub": "translator-contenthub.json",
-            "desktop":  "translator.desktop"
+            "desktop":  "translator.desktop",
+            "urls": "translator.url-dispatcher"
         }
     },
     "version": "0.1.5",

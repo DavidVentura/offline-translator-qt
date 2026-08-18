@@ -6,6 +6,7 @@ use translator::TranslatorSession;
 use crate::IoEvent;
 use crate::model::{FeatureKind, Language, Screen};
 use crate::settings::{Settings, save_settings};
+use crate::uri_handler::LaunchIntent;
 
 use super::AppBridge;
 
@@ -193,6 +194,25 @@ impl AppBridge {
         if self.detected_language_code != code {
             self.detected_language_code = code.to_string();
             self.refresh_detected_language();
+        }
+    }
+
+    pub(crate) fn defer_launch_intent(&mut self, intent: LaunchIntent) {
+        self.pending_launch_intent = Some(intent);
+    }
+
+    pub(crate) fn apply_launch_intent(&mut self, intent: LaunchIntent) {
+        match intent {
+            LaunchIntent::LiveCamera => {
+                if self.disable_ocr || !self.has_languages {
+                    eprintln!(
+                        "uri handler: dropping camera intent (disable_ocr={} has_languages={})",
+                        self.disable_ocr, self.has_languages
+                    );
+                    return;
+                }
+                self.open_live_camera();
+            }
         }
     }
 

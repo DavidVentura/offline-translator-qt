@@ -23,6 +23,7 @@ use translator::tarkka::WordWithTaggedEntries;
 
 use crate::IoEvent;
 use crate::model::{FeatureKind, Language, Screen};
+use crate::uri_handler::LaunchIntent;
 
 #[derive(QObject, Default)]
 pub struct AppBridge {
@@ -773,6 +774,9 @@ pub struct AppBridge {
     manage_filter: String,
     expanded_languages: HashSet<String>,
     manage_tts_picker_language_code: String,
+    /// A URI intent from the command line, held until the first language list lands: at startup the
+    /// catalog snapshot is still empty, so `has_languages` cannot answer yet.
+    pending_launch_intent: Option<LaunchIntent>,
     dictionary_popup_lookup_language_code: String,
     dictionary_popup_data: Option<WordWithTaggedEntries>,
 }

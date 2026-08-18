@@ -18,6 +18,12 @@ impl AppBridge {
         if self.current_screen == Screen::NoLanguages.as_i32() && self.has_languages {
             self.set_current_screen(Screen::Translation);
         }
+
+        // Consumed on the first list either way: a URI that arrived at startup should not fire
+        // minutes later, once the user has downloaded a language by hand.
+        if let Some(intent) = self.pending_launch_intent.take() {
+            self.apply_launch_intent(intent);
+        }
     }
 
     pub(crate) fn set_feature_progress_value(
