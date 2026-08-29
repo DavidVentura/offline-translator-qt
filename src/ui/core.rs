@@ -56,6 +56,11 @@ pub(crate) enum UiScale {
 
 const BASELINE_GRID_UNIT_PX: f64 = 8.0;
 
+/// The desktop UI font size the QML pixel metrics were laid out against. Desktops disagree on
+/// how large "normal" text is -- ~19px here, 12px on Windows -- so the metrics are scaled by how
+/// far the host's default font differs, rather than imposing one desktop's convention on all.
+const BASELINE_UI_FONT_PX: f64 = 19.0;
+
 impl UiScale {
     pub(crate) fn detect() -> Self {
         let Some(raw) = std::env::var_os("GRID_UNIT_PX") else {
@@ -74,10 +79,13 @@ impl UiScale {
         }
     }
 
-    pub(crate) fn factor(self) -> f64 {
+    /// `qt_ui_font_px` yields the host desktop's default UI font size. It is a closure because
+    /// only the desktop arm needs it: a shell that publishes GRID_UNIT_PX has already decided the
+    /// density, so on Lomiri the Qt font is never consulted and cannot fail the app.
+    pub(crate) fn factor(self, qt_ui_font_px: impl FnOnce() -> f64) -> f64 {
         match self {
             UiScale::ShellGridUnit(px) => px / BASELINE_GRID_UNIT_PX,
-            UiScale::QtManaged => 1.0,
+            UiScale::QtManaged => qt_ui_font_px() / BASELINE_UI_FONT_PX,
         }
     }
 
@@ -98,6 +106,7 @@ impl AppBridge {
         settings: Settings,
         session: Arc<TranslatorSession>,
         ui_scale: UiScale,
+        qt_ui_font_px: impl FnOnce() -> f64,
     ) -> Self {
         let current_screen = std::env::var("START_SCREEN")
             .ok()
@@ -108,7 +117,8 @@ impl AppBridge {
         // Asked of the document dispatcher rather than of a cfg, so the picker's filters can
         // never drift from the extensions translate_document actually dispatches on.
         let pdf_available = crate::document::supported_document_extension("probe.pdf").is_some();
-        eprintln!("ui.scale: {ui_scale:?} factor={}", ui_scale.factor());
+        let scale_factor = ui_scale.factor(qt_ui_font_px);
+        eprintln!("ui.scale: {ui_scale:?} factor={scale_factor}");
         let mut app = AppBridge {
             current_screen,
             bus_tx: Some(bus_tx),
@@ -117,7 +127,7 @@ impl AppBridge {
             desktop_mode,
             live_camera_available: cfg!(feature = "live"),
             pdf_available,
-            ui_scale: ui_scale.factor(),
+            ui_scale: scale_factor,
             doc_translate_images: true,
             ..Default::default()
         };

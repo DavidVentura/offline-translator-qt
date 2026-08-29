@@ -43,6 +43,9 @@ const APP_NAME: &str = "dev.davidv.translator";
 cpp! {{
     #include <QtCore/QCoreApplication>
     #include <QtCore/QString>
+    #include <QtGui/QGuiApplication>
+    #include <QtGui/QScreen>
+    #include <QtGui/QFont>
 }}
 
 #[cfg(feature = "live")]
@@ -208,6 +211,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     if ui_scale.qt_owns_scaling() {
         cpp!(unsafe [] {
             QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+            // Qt 5.15 defaults this to Round, which snaps Windows' common 125% and
+            // 150% display scalings to 100% and 200%. PassThrough keeps the
+            // fractional factor the user actually chose.
+            QGuiApplication::setHighDpiScaleFactorRoundingPolicy(
+                Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
         });
     }
 
@@ -253,6 +261,28 @@ fn main() -> Result<(), Box<dyn Error>> {
     let asset_dir = find_asset_dir(&main_qml)?;
     let settings = load_settings(&app_paths.config);
     let mut engine = QmlEngine::new();
+
+    // Qt resolves the host desktop's default UI font only once QGuiApplication exists, which
+    // QmlEngine::new() above creates. Point size is what platforms actually specify; convert it
+    // through the screen's logical DPI so the result is comparable across desktops. Only the
+    // desktop scaling arm calls this -- see UiScale::factor.
+    let qt_ui_font_px = || {
+        let px = cpp!(unsafe [] -> f64 as "double" {
+            const QFont font = QGuiApplication::font();
+            if (font.pixelSize() > 0) {
+                return (double)font.pixelSize();
+            }
+            const QScreen* screen = QGuiApplication::primaryScreen();
+            const double dpi = screen ? screen->logicalDotsPerInch() : 96.0;
+            return font.pointSizeF() * dpi / 72.0;
+        });
+        assert!(
+            px.is_finite() && px > 0.0,
+            "Qt reported an unusable default UI font size: {px}"
+        );
+        px
+    };
+
     let app = QObjectBox::new(AppBridge::new(
         initial_languages,
         bus_tx.clone(),
@@ -262,6 +292,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         settings,
         Arc::clone(&session),
         ui_scale,
+        qt_ui_font_px,
     ));
 
     engine.set_object_property("app".into(), app.pinned());
