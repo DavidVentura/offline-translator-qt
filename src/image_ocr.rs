@@ -6,7 +6,7 @@ use translator::image_render::{RenderOptions, render_overlay};
 use translator::ocr::{DetectedTextBox, PositionedWord};
 use translator::{BackgroundMode, OcrSourceSelection, TranslatorSession};
 
-use crate::fonts;
+use font_provider::system_fonts;
 
 pub struct ImageTranslation {
     /// Only feeds language detection now; the translated text is read off the image.
@@ -141,7 +141,7 @@ pub fn translate_image_with_session(
         language: target_code.to_string(),
         min_font_size_px: 8.0,
     };
-    let provider = fonts::provider();
+    let provider = system_fonts();
     let (rendered_rgba_bytes, translated_words) = match render_overlay(&prepared, &*provider, &opts)
     {
         Ok(rendered) => (rendered.rgba_bytes, rendered.translated_words),

@@ -7,11 +7,6 @@ mod data;
 mod document;
 mod download;
 mod eventloop;
-#[cfg(unix)]
-mod fonts;
-#[cfg(not(unix))]
-#[path = "fonts_stub.rs"]
-mod fonts;
 mod image_ocr;
 #[cfg(feature = "live")]
 mod live_camera_item;
@@ -20,11 +15,6 @@ mod live_gpu;
 #[cfg(feature = "live")]
 mod live_ocr;
 mod model;
-#[cfg(unix)]
-mod pulse;
-#[cfg(not(unix))]
-#[path = "pulse_stub.rs"]
-mod pulse;
 mod rendered_image_item;
 mod settings;
 mod tts;

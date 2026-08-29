@@ -9,10 +9,10 @@
 
 use std::ffi::CString;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::Mutex;
 
-use fontconfig::{
-    self, FC_FAMILY, FC_LANG, FC_SLANT, FC_SLANT_ITALIC, FC_SPACING, FC_WEIGHT, FC_WEIGHT_BOLD,
+use ::fontconfig::{
+    FC_FAMILY, FC_LANG, FC_SLANT, FC_SLANT_ITALIC, FC_SPACING, FC_WEIGHT, FC_WEIGHT_BOLD,
     Fontconfig, Pattern, UnicodeCoverage,
 };
 use std::collections::HashMap;
@@ -22,13 +22,6 @@ use translator::script::Script;
 
 const MAX_CHAIN: usize = 8;
 const FC_MONO: i32 = 100;
-
-pub fn provider() -> Arc<FontconfigProvider> {
-    static INSTANCE: OnceLock<Arc<FontconfigProvider>> = OnceLock::new();
-    INSTANCE
-        .get_or_init(|| Arc::new(FontconfigProvider::new()))
-        .clone()
-}
 
 pub struct FontconfigProvider {
     fc: Option<Fontconfig>,
@@ -45,7 +38,7 @@ struct CacheKey {
 }
 
 impl FontconfigProvider {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let fc = Fontconfig::new();
         if fc.is_none() {
             eprintln!("fontconfig init failed; overlay text will fall back to tofu");
@@ -173,4 +166,24 @@ fn lang_tag_for(script: Script, language: &str) -> String {
         Script::Common | Script::Inherited | Script::Other => "en",
     }
     .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bcp47_hint_wins_over_script_default() {
+        assert_eq!(lang_tag_for(Script::Han, "ja"), "ja");
+        assert_eq!(lang_tag_for(Script::Han, "zh-Hant"), "zh");
+        assert_eq!(lang_tag_for(Script::Latin, "PT_BR"), "pt");
+    }
+
+    #[test]
+    fn absent_or_undetermined_hint_falls_to_script_default() {
+        assert_eq!(lang_tag_for(Script::Han, ""), "zh-cn");
+        assert_eq!(lang_tag_for(Script::Han, "und"), "zh-cn");
+        assert_eq!(lang_tag_for(Script::Katakana, "und-Jpan"), "ja");
+        assert_eq!(lang_tag_for(Script::Common, ""), "en");
+    }
 }

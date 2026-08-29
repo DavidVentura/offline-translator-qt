@@ -1,0 +1,14 @@
+[package]
+name = "audio-sink"
+version = "0.1.0"
+edition = "2024"
+
+[target.'cfg(windows)'.dependencies.windows]
+version = "0.61"
+features = [
+    "Win32_Foundation",
+    "Win32_Media_Audio",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Variant",
+]

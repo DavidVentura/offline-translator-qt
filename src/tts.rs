@@ -7,8 +7,8 @@ use std::time::{Duration, Instant};
 
 use translator::{PcmAudio, SpeechChunk, TranslatorSession, TtsVoiceOption};
 
-use crate::pulse::PulsePlaybackStream;
 use crate::ui::UiCallbacks;
+use audio_sink::{AudioSink, PcmSamples, SampleRate};
 
 pub struct TtsVoiceRefresh {
     pub available: bool,
@@ -168,6 +168,30 @@ struct QueuedAudioChunk {
     pause_after_ms: Option<i32>,
 }
 
+fn play_chunk(
+    playback: &AudioSink,
+    rate: SampleRate,
+    chunk: &QueuedAudioChunk,
+    should_stop: &mut impl audio_sink::StopSignal,
+) -> Result<(), String> {
+    let samples = PcmSamples::new(rate, &chunk.audio.pcm_samples);
+    playback
+        .play(samples, should_stop)
+        .map_err(|e| e.to_string())?;
+    let Some(pause_after_ms) = chunk.pause_after_ms else {
+        return Ok(());
+    };
+    let pause_ms = u64::try_from(pause_after_ms)
+        .map_err(|_| format!("negative pause between speech chunks: {pause_after_ms} ms"))?;
+    if pause_ms == 0 {
+        return Ok(());
+    }
+    playback
+        .play_silence(Duration::from_millis(pause_ms), should_stop)
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 fn play_text_streaming(
     session: &Arc<TranslatorSession>,
     language_code: &str,
@@ -230,25 +254,21 @@ fn play_text_streaming(
         "tts.stream: playback starting sample_rate={} first_chunk={}",
         first_chunk.audio.sample_rate, first_chunk.chunk_index
     );
-    let playback = PulsePlaybackStream::new(first_chunk.audio.sample_rate)?;
+    let rate = SampleRate::try_from(first_chunk.audio.sample_rate).map_err(|e| e.to_string())?;
+    let playback = AudioSink::open(rate).map_err(|e| e.to_string())?;
     (ui.set_tts_state)(false, true);
-    playback.write_audio(&first_chunk.audio, &mut should_stop)?;
-    if let Some(pause_after_ms) = first_chunk.pause_after_ms {
-        playback.write_pause_ms(pause_after_ms, &mut should_stop)?;
-    }
+    play_chunk(&playback, rate, &first_chunk, &mut should_stop)?;
 
     while let Some(chunk) = recv_chunk(&rx, &mut should_stop)? {
-        playback.write_audio(&chunk.audio, &mut should_stop)?;
-        if let Some(pause_after_ms) = chunk.pause_after_ms {
-            playback.write_pause_ms(pause_after_ms, &mut should_stop)?;
-        }
+        play_chunk(&playback, rate, &chunk, &mut should_stop)?;
     }
 
     if should_stop() {
         eprintln!("tts.stream: playback interrupted generation={generation}");
-        let _ = playback.flush();
+        let _ = playback.discard();
     } else {
         eprintln!("tts.stream: playback finished generation={generation}");
+        let _ = playback.drain();
     }
 
     Ok(())

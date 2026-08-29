@@ -1,3 +1,6 @@
+[workspace]
+members = ["crates/*"]
+
 [package]
 name = "offline-translator-linux"
 version = "0.1.5"
@@ -20,9 +23,8 @@ env_logger = "0.11"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 # Must match translator's glow so GlesRenderer and our FBO share one type/context.
 glow = { version = "0.17", default-features = false, optional = true }
-
-[target.'cfg(unix)'.dependencies]
-fontconfig = "0.11.0-rc.1"
+font-provider = { path = "crates/font-provider" }
+audio-sink = { path = "crates/audio-sink" }
 
 # Cargo has no per-target feature gating, so the translator dependency is
 # declared once per target family instead. Windows drops the mupdf-backed pdf

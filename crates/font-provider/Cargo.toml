@@ -1,0 +1,13 @@
+[package]
+name = "font-provider"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Only `image-render`: that is the Qt-free slice of translator holding the
+# `FontProvider` trait, which is what lets this crate build on targets with no
+# Qt available.
+translator = { path = "/home/david/git/translator-rs", default-features = false, features = ["image-render"] }
+
+[target.'cfg(unix)'.dependencies]
+fontconfig = "0.11.0-rc.1"

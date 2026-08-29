@@ -12,7 +12,7 @@ use translator::api::ScriptedLanguage;
 use translator::{LanguageCode, TranslatorSession};
 
 #[cfg(feature = "pdf")]
-use crate::fonts;
+use font_provider::system_fonts;
 
 #[derive(Debug, Clone, Copy)]
 pub enum DocumentProgress {
@@ -247,7 +247,7 @@ fn translate_pdf(
             )));
         }
     };
-    let fonts = fonts::provider();
+    let fonts = system_fonts();
     let after_text =
         translator::pdf_write::write_translated_pdf(input_bytes, &translations, &*fonts)
             .map_err(|error| DocumentError::Other(format!("failed to write PDF: {error}")))?;
