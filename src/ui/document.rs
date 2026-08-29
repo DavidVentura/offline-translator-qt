@@ -97,7 +97,9 @@ impl AppBridge {
                     .to_string();
                 self.doc_output_name = QString::from(name);
                 self.doc_output_name_changed();
-                self.doc_output_url = QString::from(format!("file://{output_path}"));
+                self.doc_output_url = QString::from(crate::image_ocr::file_url(
+                    std::path::Path::new(&output_path),
+                ));
                 self.doc_output_url_changed();
                 self.doc_error = QString::default();
                 self.doc_error_changed();

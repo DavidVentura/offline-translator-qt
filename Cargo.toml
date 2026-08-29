@@ -24,18 +24,34 @@ glow = { version = "0.17", default-features = false, optional = true }
 [target.'cfg(unix)'.dependencies]
 fontconfig = "0.11.0-rc.1"
 
-[dependencies.translator]
+# Cargo has no per-target feature gating, so the translator dependency is
+# declared once per target family instead. Windows drops the mupdf-backed pdf
+# features and has to name image-render explicitly, which `pdf` would otherwise
+# have pulled in for the still-image overlay.
+[target.'cfg(not(windows))'.dependencies.translator]
 # git = "https://github.com/DavidVentura/translator-rs.git"
 path = "/home/david/git/translator-rs"
 default-features = false
 features = ["tts", "transliterate", "mucab", "dictionary", "ppocr", "pdf", "pdf-image-translate", "epub", "odt"]
 
+[target.'cfg(windows)'.dependencies.translator]
+# git = "https://github.com/DavidVentura/translator-rs.git"
+path = "/home/david/git/translator-rs"
+default-features = false
+features = ["tts", "transliterate", "mucab", "dictionary", "ppocr", "epub", "odt", "image-render"]
+
 [features]
-default = ["live"]
+# Empty on purpose: features can't be target-gated the way the dependency above
+# is, and both of these pull code that only builds on Linux. Defaulting them on
+# would make a bare Windows build fail on mupdf, so Linux opts in instead
+# (`--features live,pdf`).
+default = []
 # The live camera viewfinder + on-frame OCR: pulls translator's GL/tracker stack
 # and builds the QtMultimedia video filter. Off for non-Linux targets, which have
 # no camera path wired up.
 live = ["translator/gpu", "dep:glow"]
+# Document translation of PDFs, including the image/raster overlay passes.
+pdf = ["translator/pdf", "translator/pdf-image-translate"]
 
 [profile.dev]
 #debug = false

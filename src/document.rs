@@ -2,6 +2,7 @@
 //! `translate_document_path_impl` over the same translator-rs pipelines, with
 //! progress events delivered through a plain callback instead of uniffi.
 
+#[cfg(feature = "pdf")]
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
@@ -10,6 +11,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use translator::api::ScriptedLanguage;
 use translator::{LanguageCode, TranslatorSession};
 
+#[cfg(feature = "pdf")]
 use crate::fonts;
 
 #[derive(Debug, Clone, Copy)]
@@ -53,12 +55,17 @@ pub enum DocumentEvent {
     Cancelled,
 }
 
+#[cfg(feature = "pdf")]
+const DOCUMENT_EXTENSIONS: &[&str] = &["pdf", "epub", "odt", "txt"];
+#[cfg(not(feature = "pdf"))]
+const DOCUMENT_EXTENSIONS: &[&str] = &["epub", "odt", "txt"];
+
 pub fn supported_document_extension(path: &str) -> Option<String> {
     let ext = Path::new(path)
         .extension()
         .and_then(|ext| ext.to_str())?
         .to_ascii_lowercase();
-    matches!(ext.as_str(), "pdf" | "epub" | "odt" | "txt").then_some(ext)
+    DOCUMENT_EXTENSIONS.contains(&ext.as_str()).then_some(ext)
 }
 
 fn installed_languages(session: &TranslatorSession) -> Vec<ScriptedLanguage> {
@@ -71,6 +78,7 @@ fn installed_languages(session: &TranslatorSession) -> Vec<ScriptedLanguage> {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[cfg_attr(not(feature = "pdf"), allow(unused_variables))]
 pub fn translate_document(
     session: &TranslatorSession,
     input_path: &str,
@@ -158,6 +166,7 @@ pub fn translate_document(
             translator::epub::EpubTranslateError::Cancelled => DocumentError::Cancelled,
             other => DocumentError::Other(format!("failed to translate EPUB: {other}")),
         })?,
+        #[cfg(feature = "pdf")]
         "pdf" => translate_pdf(
             session,
             &input_bytes,
@@ -189,6 +198,7 @@ pub fn translate_document(
 /// then page-raster overlay. Each later pass must not see its own output:
 /// text surgery after the overlay would re-process the overlay's `Tj` ops,
 /// and XObject re-encoding after the raster pass would bake duplicate text.
+#[cfg(feature = "pdf")]
 #[allow(clippy::too_many_arguments)]
 fn translate_pdf(
     session: &TranslatorSession,

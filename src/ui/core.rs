@@ -105,6 +105,9 @@ impl AppBridge {
             .and_then(|s| s.parse::<i32>().ok())
             .unwrap_or(Screen::NoLanguages.as_i32());
         let desktop_mode = Platform::detect().is_desktop();
+        // Asked of the document dispatcher rather than of a cfg, so the picker's filters can
+        // never drift from the extensions translate_document actually dispatches on.
+        let pdf_available = crate::document::supported_document_extension("probe.pdf").is_some();
         eprintln!("ui.scale: {ui_scale:?} factor={}", ui_scale.factor());
         let mut app = AppBridge {
             current_screen,
@@ -112,6 +115,8 @@ impl AppBridge {
             session: Some(session),
             previous_screen: Screen::Translation,
             desktop_mode,
+            live_camera_available: cfg!(feature = "live"),
+            pdf_available,
             ui_scale: ui_scale.factor(),
             doc_translate_images: true,
             ..Default::default()

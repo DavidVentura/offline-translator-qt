@@ -13,9 +13,9 @@ export AUTOMATION_TEXT="${AUTOMATION_TEXT:-${3:-hello}}"
 export AUTOMATION_SCREENSHOT_PATH="${AUTOMATION_SCREENSHOT_PATH:-${4:-${repo_root}/screenshot.png}}"
 export AUTOMATION_QUIT="${AUTOMATION_QUIT:-1}"
 
-cargo build
+cargo build --features live,pdf
 rm -f "${AUTOMATION_SCREENSHOT_PATH}"
-xvfb-run -a cargo run
+xvfb-run -a cargo run --features live,pdf
 
 if [ -f "${AUTOMATION_SCREENSHOT_PATH}" ]; then
   echo "saved screenshot to ${AUTOMATION_SCREENSHOT_PATH}"

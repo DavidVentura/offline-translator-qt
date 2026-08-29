@@ -4,6 +4,9 @@ import QtQuick.Dialogs 1.3
 Item {
     property var appBridge
 
+    readonly property var imageExtensions: ["*.png", "*.jpg", "*.jpeg", "*.webp", "*.bmp", "*.gif", "*.tif", "*.tiff"]
+    readonly property var documentExtensions: (appBridge.pdf_available ? ["*.pdf"] : []).concat(["*.epub", "*.odt", "*.txt"])
+
     function open() {
         picker.open()
     }
@@ -12,9 +15,9 @@ Item {
         id: picker
         title: "Choose an image or document"
         nameFilters: [
-            "Images and documents (*.png *.jpg *.jpeg *.webp *.bmp *.gif *.tif *.tiff *.pdf *.epub *.odt *.txt)",
-            "Documents (*.pdf *.epub *.odt *.txt)",
-            "Images (*.png *.jpg *.jpeg *.webp *.bmp *.gif *.tif *.tiff)"
+            "Images and documents (" + imageExtensions.concat(documentExtensions).join(" ") + ")",
+            "Documents (" + documentExtensions.join(" ") + ")",
+            "Images (" + imageExtensions.join(" ") + ")"
         ]
         selectExisting: true
         selectMultiple: false

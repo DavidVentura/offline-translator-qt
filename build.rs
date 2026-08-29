@@ -20,9 +20,9 @@ fn main() {
 
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
         build_uri_handler(&qt_include_path);
-    }
-    if std::env::var_os("CARGO_FEATURE_LIVE").is_some() {
-        build_live_filter(&qt_include_path);
+        if std::env::var_os("CARGO_FEATURE_LIVE").is_some() {
+            build_live_filter(&qt_include_path);
+        }
     }
 }
 

@@ -4,7 +4,7 @@
 # across runs. No abuild, no tarball.
 #
 # Usage:
-#   ./packaging/postmarketos/dev-build.sh                  # cargo build --release
+#   ./packaging/postmarketos/dev-build.sh                  # cargo build --release --features live,pdf
 #   ./packaging/postmarketos/dev-build.sh shell            # interactive shell
 #   ./packaging/postmarketos/dev-build.sh cargo check      # any cargo subcommand
 set -euo pipefail
@@ -15,7 +15,7 @@ repo_root="$(cd "$script_dir/../.." && pwd)"
 nice -n 19 docker build -t offline-translator-linux-apk -f "$script_dir/Dockerfile" "$repo_root"
 
 if [ "$#" -eq 0 ]; then
-  cmd=(cargo build --release)
+  cmd=(cargo build --release --features live,pdf)
 elif [ "$1" = "shell" ]; then
   cmd=(sh)
 else

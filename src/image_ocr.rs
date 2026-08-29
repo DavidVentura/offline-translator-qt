@@ -35,24 +35,52 @@ pub(crate) fn load_preview_rgba(
     Ok((loaded.rgba_bytes, loaded.width, loaded.height))
 }
 
+/// Renders a filesystem path as the `file:` URL Qt expects: `file:///home/x/a.png` on POSIX,
+/// `file:///C:/x/a.png` on Windows. Qt only accepts the three-slash form, so a drive-lettered
+/// path needs the extra slash a plain `"file://" + path` concatenation never adds.
+pub fn file_url(path: &Path) -> String {
+    let text = path.to_string_lossy().replace('\\', "/");
+    let mut url = String::from("file://");
+    if !text.starts_with('/') {
+        url.push('/');
+    }
+    for byte in text.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' | b':' => {
+                url.push(byte as char)
+            }
+            _ => url.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    url
+}
+
+/// Inverse of [`file_url`], and also accepts a bare path so command-line arguments can go
+/// through the same door as a `FileDialog` URL.
 pub fn resolve_local_path(input: &str) -> Option<PathBuf> {
     if input.is_empty() {
         return None;
     }
 
-    if let Some(path) = input.strip_prefix("file://") {
-        let decoded = percent_decode(path);
-        let local = PathBuf::from(decoded);
-        if !local.as_os_str().is_empty() {
-            return Some(local);
-        }
-    }
+    let Some(rest) = input.strip_prefix("file://") else {
+        return Some(PathBuf::from(percent_decode(input)));
+    };
 
-    let direct = PathBuf::from(percent_decode(input));
-    if direct.exists() {
-        return Some(direct);
+    let path = strip_drive_letter_slash(rest);
+    if path.is_empty() {
+        return None;
     }
-    Some(direct)
+    Some(PathBuf::from(percent_decode(path)))
+}
+
+/// `file:///C:/x.png` leaves `/C:/x.png` once the empty authority is gone, which is not a path
+/// any OS accepts. RFC 8089 makes the leading slash optional exactly for this shape.
+fn strip_drive_letter_slash(path: &str) -> &str {
+    let bytes = path.as_bytes();
+    if bytes.len() >= 3 && bytes[0] == b'/' && bytes[1].is_ascii_alphabetic() && bytes[2] == b':' {
+        return &path[1..];
+    }
+    path
 }
 
 pub fn translate_image_with_session(
@@ -245,5 +273,47 @@ fn map_background_mode(label: &str) -> BackgroundMode {
         "Light Background" => BackgroundMode::BlackOnWhite,
         "Dark Background" => BackgroundMode::WhiteOnBlack,
         _ => BackgroundMode::AutoDetect,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{file_url, resolve_local_path};
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn posix_path_round_trips() {
+        let url = file_url(Path::new("/home/user/a b.png"));
+        assert_eq!(url, "file:///home/user/a%20b.png");
+        assert_eq!(
+            resolve_local_path(&url),
+            Some(PathBuf::from("/home/user/a b.png"))
+        );
+    }
+
+    #[test]
+    fn windows_path_gains_the_third_slash() {
+        assert_eq!(
+            file_url(Path::new(r"C:\Users\me\a.png")),
+            "file:///C:/Users/me/a.png"
+        );
+    }
+
+    #[test]
+    fn windows_url_loses_the_authority_slash() {
+        assert_eq!(
+            resolve_local_path("file:///C:/Users/me/a.png"),
+            Some(PathBuf::from("C:/Users/me/a.png"))
+        );
+    }
+
+    #[test]
+    fn bare_path_is_accepted() {
+        assert_eq!(
+            resolve_local_path("/tmp/a.png"),
+            Some(PathBuf::from("/tmp/a.png"))
+        );
+        assert_eq!(resolve_local_path(""), None);
+        assert_eq!(resolve_local_path("file://"), None);
     }
 }

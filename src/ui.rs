@@ -194,6 +194,13 @@ pub struct AppBridge {
     ),
 
     pub desktop_mode: qt_property!(bool; CONST),
+    /// Whether the live camera pipeline was compiled in. QML must gate on this before touching
+    /// anything under `LiveCameraScreen.qml`: `LiveCameraItem` is only registered with the `live`
+    /// feature, and an unknown type fails the whole document it appears in.
+    pub live_camera_available: qt_property!(bool; CONST),
+    /// Whether the document pipeline was built with PDF support, so the file picker cannot offer
+    /// a format the translate path would then reject.
+    pub pdf_available: qt_property!(bool; CONST),
     pub ui_scale: qt_property!(f64; CONST),
     pub automation_enabled: qt_property!(bool; CONST),
     pub automation_from: qt_property!(QString; CONST),
@@ -301,7 +308,8 @@ pub struct AppBridge {
 
     pub asset_url: qt_method!(
         fn asset_url(&self, name: QString) -> QString {
-            format!("file://{}/{}", self.asset_dir, name).into()
+            let path = std::path::Path::new(&self.asset_dir).join(name.to_string());
+            QString::from(crate::image_ocr::file_url(&path))
         }
     ),
     pub save_automation_screenshot: qt_method!(

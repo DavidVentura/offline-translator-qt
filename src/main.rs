@@ -341,6 +341,16 @@ fn find_main_qml() -> Result<String, Box<dyn Error>> {
         return Ok(qml_path.display().to_string());
     }
 
+    // Windows ships qml/ and assets/ next to the executable; there is no
+    // prefix to hang share/ off.
+    if let Some(qml_path) = exe
+        .parent()
+        .map(|bin_dir| bin_dir.join("qml").join("Main.qml"))
+        .filter(|path| path.exists())
+    {
+        return Ok(qml_path.display().to_string());
+    }
+
     if dev_path.exists() {
         return Ok(dev_path.display().to_string());
     }

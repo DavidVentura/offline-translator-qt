@@ -774,7 +774,7 @@ Item {
     }
 
     RoundButton {
-        visible: !appBridge.disable_ocr
+        visible: !appBridge.disable_ocr && appBridge.live_camera_available
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.rightMargin: ui.dp(24)

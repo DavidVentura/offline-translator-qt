@@ -1,6 +1,10 @@
 clickable_minimum_required: 8.4.0
 framework: ubuntu-touch-24.04-1.x
 builder: rust
+# live/pdf are not default features so a bare Windows build works; Linux opts in.
+build_args:
+- --features
+- live,pdf
 cargo_home: /home/david/.clickable/cargo
 dependencies_host:
 - libpulse-dev

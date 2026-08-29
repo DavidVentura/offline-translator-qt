@@ -135,20 +135,30 @@ ApplicationWindow {
         }
         } // rotateRoot
 
-        // Permanent (not Loader-mounted) on purpose: destroying the Camera
-        // element triggers qtubuntu-camera's plugin to emit a final
-        // QCameraControl::statusChanged from inside ~QCamera into a connection
-        // list that includes a freed receiver, segfaulting in QQmlData::
-        // isSignalConnected. Keeping the QCamera alive for the app's lifetime
-        // and toggling cameraState avoids the destructor path entirely.
-        LiveCameraScreen {
+        // Loaded by URL rather than instantiated inline so that a build without the `live`
+        // feature never compiles LiveCameraScreen.qml: it names LiveCameraItem, which is only
+        // registered under that feature, and an unresolved type would take Main.qml down with
+        // it. Nothing ever unloads it again: destroying the Camera element triggers
+        // qtubuntu-camera's plugin to emit a final QCameraControl::statusChanged from inside
+        // ~QCamera into a connection list that includes a freed receiver, segfaulting in
+        // QQmlData::isSignalConnected. Keeping the QCamera alive for the app's lifetime and
+        // toggling cameraState avoids that path.
+        Loader {
             id: liveCameraScreen
             anchors.fill: parent
             z: 100
             visible: app.live_camera_open
-            screenActive: app.live_camera_open
-            appBridge: app
-            theme: theme
+            // setSource rather than `source`, so appBridge is in place before the screen's own
+            // bindings and Component.onCompleted run.
+            Component.onCompleted: {
+                if (!app.live_camera_available)
+                    return
+                setSource("LiveCameraScreen.qml", {
+                    "appBridge": app,
+                    "theme": theme,
+                    "screenActive": Qt.binding(function() { return app.live_camera_open })
+                })
+            }
         }
 
         Timer {
