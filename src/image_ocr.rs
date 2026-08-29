@@ -38,13 +38,28 @@ pub(crate) fn load_preview_rgba(
 /// Renders a filesystem path as the `file:` URL Qt expects: `file:///home/x/a.png` on POSIX,
 /// `file:///C:/x/a.png` on Windows. Qt only accepts the three-slash form, so a drive-lettered
 /// path needs the extra slash a plain `"file://" + path` concatenation never adds.
-pub fn file_url(path: &Path) -> String {
-    let text = path.to_string_lossy().replace('\\', "/");
-    let mut url = String::from("file://");
-    if !text.starts_with('/') {
-        url.push('/');
+// Windows `canonicalize` hands back extended-length paths (`\\?\C:\...`). That
+// prefix is a Win32 API artifact: Qt's URL parser percent-encodes the `?` and
+// then cannot open the file.
+fn strip_verbatim_prefix(text: &str) -> String {
+    if let Some(share) = text.strip_prefix(r"\\?\UNC\") {
+        return format!(r"\\{share}");
     }
-    for byte in text.bytes() {
+    text.strip_prefix(r"\\?\").unwrap_or(text).to_string()
+}
+
+pub fn file_url(path: &Path) -> String {
+    let text = strip_verbatim_prefix(&path.to_string_lossy()).replace('\\', "/");
+    // A UNC share is the one case with a real authority: `//server/share` is
+    // `file://server/share`, not a path under an empty authority (RFC 8089).
+    let (prefix, body) = match text.strip_prefix("//") {
+        Some(share) => ("file://", share.to_string()),
+        None if text.starts_with('/') => ("file://", text),
+        None => ("file:///", text),
+    };
+
+    let mut url = String::from(prefix);
+    for byte in body.bytes() {
         match byte {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' | b':' => {
                 url.push(byte as char)
@@ -278,6 +293,22 @@ fn map_background_mode(label: &str) -> BackgroundMode {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn verbatim_windows_paths_lose_their_prefix() {
+        assert_eq!(
+            file_url(Path::new(r"\\?\Z:\app\assets\icon.svg")),
+            "file:///Z:/app/assets/icon.svg"
+        );
+    }
+
+    #[test]
+    fn verbatim_unc_paths_keep_their_authority() {
+        assert_eq!(
+            file_url(Path::new(r"\\?\UNC\server\share\icon.svg")),
+            "file://server/share/icon.svg"
+        );
+    }
+
     use super::{file_url, resolve_local_path};
     use std::path::{Path, PathBuf};
 

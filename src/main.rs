@@ -1,3 +1,4 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 // cpp! expands its body token-by-token recursively; the persistent-texture
 // block in rendered_image_item.rs needs a higher limit than the default.
 #![recursion_limit = "1024"]
