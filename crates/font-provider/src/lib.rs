@@ -11,6 +11,15 @@ use translator::font_provider::FontProvider;
 #[cfg(unix)]
 mod fontconfig;
 
+#[cfg(windows)]
+mod directwrite;
+
+/// The `FontRequest` → DirectWrite query mapping is pure and its tests are meant
+/// to run on the development host, so it is compiled everywhere even though only
+/// `directwrite` consumes it.
+#[cfg_attr(not(windows), allow(dead_code))]
+mod dwrite_query;
+
 pub type SharedFontProvider = Arc<dyn FontProvider + Send + Sync>;
 
 /// The process-wide provider. Shared because the backing implementations hold
@@ -25,9 +34,14 @@ fn build_provider() -> SharedFontProvider {
     Arc::new(fontconfig::FontconfigProvider::new())
 }
 
-/// Null font provider for platforms without fontconfig. Overlay and PDF text
-/// render as tofu until a native provider (e.g. DirectWrite) is wired up here.
-#[cfg(not(unix))]
+#[cfg(windows)]
+fn build_provider() -> SharedFontProvider {
+    Arc::new(directwrite::DirectWriteProvider::new())
+}
+
+/// Null font provider for platforms with neither fontconfig nor DirectWrite.
+/// Overlay and PDF text render as tofu until a native provider is wired up here.
+#[cfg(not(any(unix, windows)))]
 fn build_provider() -> SharedFontProvider {
     Arc::new(translator::font_provider::NoFontProvider)
 }

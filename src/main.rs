@@ -4,6 +4,7 @@
 #![recursion_limit = "1024"]
 
 mod catalog_state;
+mod clipboard;
 mod data;
 mod document;
 mod download;

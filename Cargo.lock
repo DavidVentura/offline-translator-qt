@@ -855,6 +855,8 @@ version = "0.1.0"
 dependencies = [
  "fontconfig",
  "translator",
+ "windows",
+ "windows-core",
 ]
 
 [[package]]

@@ -3,6 +3,7 @@ use std::process::Command;
 
 fn main() {
     println!("cargo:rerun-if-changed=src/main.rs");
+    println!("cargo:rerun-if-changed=src/clipboard.rs");
     println!("cargo:rerun-if-changed=src/rendered_image_item.rs");
     println!("cargo:rerun-if-changed=src/live_camera_item.rs");
 
@@ -24,6 +25,46 @@ fn main() {
             build_live_filter(&qt_include_path);
         }
     }
+
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        build_win_resources();
+    }
+}
+
+// The application icon and the properties-dialog metadata only exist in a PE if
+// a compiled resource is linked in. llvm-rc is used rather than a crate like
+// winresource because those probe for MSVC's rc.exe and assume a Windows host;
+// llvm-rc is already part of the cross toolchain (packaging/windows/env.sh).
+fn build_win_resources() {
+    println!("cargo:rerun-if-changed=packaging/windows/app.rc");
+    println!("cargo:rerun-if-changed=packaging/windows/app.ico");
+
+    let out_dir = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR missing"));
+    let res = out_dir.join("app.res");
+    let major = std::env::var("CARGO_PKG_VERSION_MAJOR").expect("CARGO_PKG_VERSION_MAJOR missing");
+    let minor = std::env::var("CARGO_PKG_VERSION_MINOR").expect("CARGO_PKG_VERSION_MINOR missing");
+    let patch = std::env::var("CARGO_PKG_VERSION_PATCH").expect("CARGO_PKG_VERSION_PATCH missing");
+    let version = std::env::var("CARGO_PKG_VERSION").expect("CARGO_PKG_VERSION missing");
+
+    let status = Command::new("llvm-rc")
+        .arg("/D")
+        .arg(format!("VER_MAJOR={major}"))
+        .arg("/D")
+        .arg(format!("VER_MINOR={minor}"))
+        .arg("/D")
+        .arg(format!("VER_PATCH={patch}"))
+        .arg("/D")
+        .arg(format!("VER_STRING=\"{version}\""))
+        .arg("/FO")
+        .arg(&res)
+        .arg("packaging/windows/app.rc")
+        .status()
+        .expect("failed to launch llvm-rc — source packaging/windows/env.sh");
+    if !status.success() {
+        panic!("llvm-rc failed on packaging/windows/app.rc");
+    }
+
+    println!("cargo:rustc-link-arg-bins={}", res.display());
 }
 
 // Same story as the video filter: the D-Bus object exporting

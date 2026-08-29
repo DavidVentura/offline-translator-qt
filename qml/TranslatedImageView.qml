@@ -239,27 +239,15 @@ Item {
         }
     }
 
-    // Off-screen carrier: QML has no clipboard API, so copying goes through a TextEdit the way the
-    // output pane's copy button already does.
-    TextEdit {
-        id: clipboardCarrier
-        visible: false
-        text: root.appBridge ? root.appBridge.selection_text : ""
-    }
-
-    function copySelection() {
-        clipboardCarrier.selectAll()
-        clipboardCarrier.copy()
-        clipboardCarrier.deselect()
-    }
-
     MouseArea {
         id: selectionArea
         visible: root.interactive && paintedBounds.width > 0 && paintedBounds.height > 0
         enabled: visible
         anchors.fill: parent
         // Panning is a plain drag of the wrapper; Qt suppresses `clicked` once the drag threshold
-        // is crossed, which is exactly the tap-vs-pan split we want.
+        // is crossed, which is exactly the tap-vs-pan split we want. That suppression only applies
+        // while drag.target is set, so a handle drag — which nulls it — still emits `clicked` and
+        // has to suppress itself; see onReleased/onClicked.
         drag.target: (handleDrag || root.zoom <= root.minZoom) ? null : content
         drag.axis: Drag.XAndYAxis
         drag.minimumX: -root.maxPanX
@@ -307,12 +295,18 @@ Item {
         }
 
         onReleased: {
-            handleDrag = false
+            // handleDrag deliberately survives the release: `clicked` fires after this and needs
+            // it to know the press was a handle drag rather than a tap. onPressed clears it.
             root.dragAnchor = -1
         }
 
-        // Only fires when the press did not turn into a drag, so a pan never selects.
+        // A pan never reaches here (Qt suppresses `clicked` after a real drag), but a handle drag
+        // does, and collapsing the selection to the word under the cursor would undo the drag.
         onClicked: function(mouse) {
+            if (handleDrag) {
+                handleDrag = false
+                return
+            }
             if (!root.selectable)
                 return
             const word = root.appBridge.image_word_at(root.unmapX(mouse.x), root.unmapY(mouse.y))

@@ -11,3 +11,15 @@ translator = { path = "/home/david/git/translator-rs", default-features = false,
 
 [target.'cfg(unix)'.dependencies]
 fontconfig = "0.11.0-rc.1"
+
+[target.'cfg(windows)'.dependencies.windows]
+version = "0.61"
+features = [
+    "Win32_Foundation",
+    "Win32_Graphics_DirectWrite",
+]
+
+# `#[implement]` expands to `::windows_core::` paths, so the crate `windows`
+# re-exports as `windows::core` also has to be nameable at the crate root.
+[target.'cfg(windows)'.dependencies.windows-core]
+version = "0.61"

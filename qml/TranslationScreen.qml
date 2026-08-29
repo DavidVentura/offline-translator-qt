@@ -237,7 +237,7 @@ Item {
                             anchors.fill: parent
                             anchors.margins: -ui.dp(6)
                             onClicked: {
-                                inlineImageView.copySelection()
+                                appBridge.set_clipboard_text(appBridge.selection_text)
                                 inlineImageView.clearSelection()
                             }
                         }

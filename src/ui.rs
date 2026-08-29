@@ -192,6 +192,11 @@ pub struct AppBridge {
             self.toggle_image_original_impl();
         }
     ),
+    pub set_clipboard_text: qt_method!(
+        fn set_clipboard_text(&mut self, text: QString) {
+            crate::clipboard::set_text(text);
+        }
+    ),
 
     pub desktop_mode: qt_property!(bool; CONST),
     /// Whether the live camera pipeline was compiled in. QML must gate on this before touching

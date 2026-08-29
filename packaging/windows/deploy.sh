@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# Assembles a runnable Windows tree from a built .exe: resolves the transitive
-# Qt DLL closure, copies the plugins Qt loads by name (which no dependency walk
-# can discover), and lays out qml/ and assets/ the way find_main_qml expects.
+# Builds the app, then assembles a runnable Windows tree from it: resolves the
+# transitive Qt DLL closure, copies the plugins Qt loads by name (which no
+# dependency walk can discover), lays out qml/ and assets/ the way
+# find_main_qml expects, and zips the result.
 #
 #   source packaging/windows/env.sh
-#   cargo xwin build --release --target x86_64-pc-windows-msvc
 #   ./packaging/windows/deploy.sh [outdir]
+#
+# The build is included on purpose. Deploying a stale exe looks exactly like
+# "my fix did not take effect", with nothing to indicate the binary is old --
+# and it is easy to forget the compile when the change was only to a .qml file,
+# which is copied rather than compiled. OTL_SKIP_BUILD=1 skips it.
 #
 # This is a stand-in for windeployqt, which is a Windows binary we cannot run.
 set -euo pipefail
@@ -16,7 +21,11 @@ ROOT="${OTL_WIN_ROOT:-$HOME/.cache/otl-windows}"
 QT_DIR="${QT_DIR:-$ROOT/qt/5.15.2/msvc2019_64}"
 EXE="$repo_root/target/x86_64-pc-windows-msvc/release/offline-translator-linux.exe"
 
-[ -f "$EXE" ] || { echo "!! build first: $EXE missing" >&2; exit 1; }
+if [ "${OTL_SKIP_BUILD:-}" != "1" ]; then
+  echo "==> building"
+  ( cd "$repo_root" && cargo xwin build --release --target x86_64-pc-windows-msvc )
+fi
+[ -f "$EXE" ] || { echo "!! $EXE missing (OTL_SKIP_BUILD=1 with no prior build?)" >&2; exit 1; }
 [ -d "$QT_DIR" ] || { echo "!! Qt not found at $QT_DIR — run setup-toolchain.sh" >&2; exit 1; }
 
 rm -rf "$OUT"
@@ -63,10 +72,41 @@ done
 # QtQuick.2 is the plugin backing `import QtQuick`, and no import line names it.
 [ -e "$QT_DIR/qml/QtQuick.2" ] && cp -r "$QT_DIR/qml/QtQuick.2" "$OUT/qml/"
 
+# Prune before the DLL closure runs, so nothing reachable only from this dead
+# weight gets pulled in after it.
+
+# Qt ships debug plugins (`<name>d.dll`) beside the release ones inside each QML
+# module, and `cp -r` takes both. Only drop one when its release sibling exists,
+# so a library legitimately ending in "d" survives.
+find "$OUT/qml" -name "*d.dll" | while read -r dbg; do
+  [ -f "${dbg%d.dll}.dll" ] && rm -f "$dbg"
+done
+
+# QtQuick.Controls ships four alternate styles. Nothing selects one (no
+# QQuickStyle call, no QT_QUICK_CONTROLS_STYLE, no qtquickcontrols2.conf), so
+# the Default style is used and these are unreachable.
+for style in Imagine Material Universal Fusion; do
+  rm -rf "$OUT/qml/QtQuick/Controls.2/$style"
+done
+
 # Our own QML sits alongside Qt's module directories: find_main_qml looks for
 # <exe dir>/qml/Main.qml, and the names never collide (ours are files).
 cp "$repo_root"/qml/*.qml "$OUT/qml/"
 cp -r "$repo_root/assets" "$OUT/assets"
+
+# The MSVC runtime, deployed app-locally. Microsoft supports this and it spares
+# users installing vc_redist.x64.exe first — which they would otherwise have to,
+# because Qt5Core.dll imports MSVCP140 independently of how our exe is linked, so
+# `-C target-feature=+crt-static` would not avoid it. The trade is that an
+# app-local CRT is not serviced by Windows Update; we own updating it.
+# Populate with: packaging/windows/fetch-vcruntime.sh
+VCRT_DIR="${VCRT_DIR:-$ROOT/vcruntime}"
+if [ -d "$VCRT_DIR" ] && [ -n "$(ls -A "$VCRT_DIR"/*.dll 2>/dev/null)" ]; then
+  cp "$VCRT_DIR"/*.dll "$OUT/"
+else
+  echo "    (no MSVC runtime in $VCRT_DIR — users will need vc_redist.x64.exe;"
+  echo "     see packaging/windows/fetch-vcruntime.sh)"
+fi
 
 # Transitive Qt DLL closure, seeded from the exe AND every plugin copied above.
 python3 - "$QT_DIR/bin" "$OUT" <<'PY'
@@ -93,14 +133,18 @@ while queue:
 print("Qt DLLs:", " ".join(sorted(copied)))
 PY
 
+zip_out="$OUT.zip"
+rm -f "$zip_out"
+( cd "$(dirname "$OUT")" && zip -qr9 "$zip_out" "$(basename "$OUT")" )
+
 cat <<EOF
 
 ==> $OUT ($(du -sh "$OUT" | cut -f1))
+==> $zip_out ($(du -h "$zip_out" | cut -f1))
 
 Run under wine:
-  WINEPREFIX=\${WINEPREFIX:-~/.wine-otl} wine "$OUT/offline-translator-linux.exe"
+  ./packaging/windows/run-wine.sh
 
-MSVCP140.dll / VCRUNTIME140*.dll are NOT bundled — they come from the MSVC
-redistributable. Wine provides its own; a real Windows machine needs the
-redist installed, or the app linked with -C target-feature=+crt-static.
+Run on real Windows:
+  cd /home/david/vm/winvm && ./run-in-vm.sh
 EOF
