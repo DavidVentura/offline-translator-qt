@@ -1,6 +1,6 @@
 # Offline Translator
 
-Qt port of my [Android offline translator](https://github.com/DavidVentura/firefox-translator), built to run on Linux phones.
+Qt port of my [Android offline translator](https://github.com/DavidVentura/firefox-translator), built to run on Linux phones. It also works on Linux desktop and Windows.
 
 It performs text and image translation completely offline using on-device models.
 It also supports automatic language detection, transliteration for non-Latin scripts, and a built-in word dictionary.
@@ -19,12 +19,16 @@ Language packs contain the translation models, so translation happens entirely o
 
 ## Tech
 
-- Translation models are from [firefox-translations-models](https://github.com/mozilla/firefox-translations-models/tree/main)
-- Translation runtime is [bergamot-translator](https://github.com/browsermt/bergamot-translator)
-- OCR is powered by [Tesseract](https://github.com/tesseract-ocr/tesseract)
-- Automatic language detection uses [cld2](https://github.com/CLD2Owners/cld2)
-- Dictionary data is based on Wiktionary exports from [Kaikki](https://kaikki.org/)
-- TTS uses [Piper](https://github.com/OHF-Voice/piper1-gpl), [Coqui](https://github.com/coqui-ai/tts), [Kokoro](https://github.com/hexgrad/kokoro), [MMS](https://huggingface.co/facebook/mms-tts), [Sherpa ONNX](https://github.com/k2-fsa/sherpa-onnx), and [Mimic3](https://github.com/MycroftAI/mimic3) voices
+- Translation models are Firefox' [translations models](https://github.com/mozilla/translations)
+- OCR models are [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)
+- Automatic language detection is done via [cld2](https://github.com/CLD2Owners/cld2)
+- Dictionary is based on data from Wiktionary, exported by [Kaikki](https://kaikki.org/)
+  - For Japanese specifically, there's a second "word dictionary" (Mecab) for transliterating Kanji
+- TTS uses [Piper](https://github.com/OHF-Voice/piper1-gpl), [Coqui](https://github.com/coqui-ai/tts), [Kokoro](https://github.com/hexgrad/kokoro), [MMS](https://huggingface.co/facebook/mms-tts), [Sherpa ONNX](https://github.com/k2-fsa/sherpa-onnx), [Mimic3](https://github.com/MycroftAI/mimic3) voices
+- PDF surgery uses [mupdf](https://github.com/ArtifexSoftware/mupdf) and [lopdf](https://github.com/J-F-Liu/lopdf)
+- Inference engines are:
+  - Translation models: [slimt](https://github.com/jerinphilip/slimt)
+  - Paddle OCR, TTS, document alignment: [MNN](https://github.com/alibaba/MNN/)
 
 ## Building
 
