@@ -6,6 +6,7 @@ use translator::TranslatorSession;
 use crate::IoEvent;
 use crate::model::{FeatureKind, Language, Screen};
 use crate::settings::{Settings, save_settings};
+use crate::tts::SpeechSpeed;
 use crate::uri_handler::LaunchIntent;
 
 use super::AppBridge;
@@ -166,8 +167,11 @@ impl AppBridge {
         app.disable_ocr = settings.disable_ocr;
         app.show_transliteration_output = settings.show_transliteration_output;
         app.show_transliteration_input = settings.show_transliteration_input;
-        app.tts_playback_speed = settings.tts_playback_speed.clamp(0.5, 2.0);
-        app.tts_voice_overrides = settings.tts_voice_overrides.clone();
+        app.tts_playback_speed = SpeechSpeed::new(settings.tts_playback_speed).value();
+        app.tts_playback_speed_min = SpeechSpeed::MIN;
+        app.tts_playback_speed_max = SpeechSpeed::MAX;
+        app.tts_playback_speed_step = SpeechSpeed::STEP;
+        app.tts_voice_selections = settings.tts_voice_selections.clone();
 
         app.set_languages_value(languages);
 
@@ -200,7 +204,7 @@ impl AppBridge {
             show_transliteration_output: self.show_transliteration_output,
             show_transliteration_input: self.show_transliteration_input,
             tts_playback_speed: self.tts_playback_speed,
-            tts_voice_overrides: self.tts_voice_overrides.clone(),
+            tts_voice_selections: self.tts_voice_selections.clone(),
         };
         save_settings(&self.config_dir, &settings);
     }

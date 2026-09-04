@@ -1,5 +1,6 @@
 mod error;
 mod pcm;
+#[cfg(windows)]
 mod wait;
 
 #[cfg(any(windows, test))]

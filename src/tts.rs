@@ -5,16 +5,37 @@ use std::sync::mpsc::{RecvTimeoutError, SyncSender, sync_channel};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use translator::{PcmAudio, SpeechChunk, TranslatorSession, TtsVoiceOption};
+use translator::{PcmAudio, SpeechChunk, TranslatorSession};
 
+use crate::model::TtsVoiceSelection;
 use crate::ui::UiCallbacks;
 use audio_sink::{AudioSink, PcmSamples, SampleRate};
 
-pub struct TtsVoiceRefresh {
-    pub available: bool,
-    pub voices: Vec<TtsVoiceOption>,
-    pub selected_voice_name: String,
-    pub selected_voice_display_name: String,
+/// Playback rate multiplier, clamped to the range the speed slider offers and quantized to the
+/// slider's step so a persisted value round-trips exactly.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SpeechSpeed(f32);
+
+impl SpeechSpeed {
+    pub const MIN: f32 = 0.7;
+    pub const MAX: f32 = 2.0;
+    pub const STEP: f32 = 0.1;
+
+    pub fn new(value: f32) -> Self {
+        let clamped = value.clamp(Self::MIN, Self::MAX);
+        let quantized = (clamped / Self::STEP).round() * Self::STEP;
+        Self(quantized.clamp(Self::MIN, Self::MAX))
+    }
+
+    pub fn value(self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for SpeechSpeed {
+    fn default() -> Self {
+        Self::new(1.0)
+    }
 }
 
 static PLAYBACK_GENERATION: AtomicU64 = AtomicU64::new(0);
@@ -35,69 +56,6 @@ fn chunk_preview(text: &str) -> String {
 
 pub fn stop_playback() {
     PLAYBACK_GENERATION.fetch_add(1, Ordering::SeqCst);
-}
-
-pub fn load_tts_voices(
-    session: &TranslatorSession,
-    language_code: &str,
-    selected_voice_name: Option<&str>,
-) -> Result<TtsVoiceRefresh, String> {
-    let voices = match catch_tts_panic(|| -> Result<Option<Vec<TtsVoiceOption>>, String> {
-        match session.available_tts_voices(language_code) {
-            Ok(voices) => Ok(Some(voices)),
-            Err(err) if err.is_missing_asset() => Ok(None),
-            Err(err) => Err(err.message),
-        }
-    })? {
-        Some(voices) => voices,
-        None => {
-            return Ok(TtsVoiceRefresh {
-                available: false,
-                voices: Vec::new(),
-                selected_voice_name: String::new(),
-                selected_voice_display_name: "Default".to_string(),
-            });
-        }
-    };
-
-    let voice_preview = voices
-        .iter()
-        .take(8)
-        .map(|voice| format!("{}={}", voice.name, voice.speaker_id))
-        .collect::<Vec<_>>();
-    eprintln!(
-        "tts.load_tts_voices: language={} returned {} voice(s) preview={:?}{}",
-        language_code,
-        voices.len(),
-        voice_preview,
-        if voices.len() > voice_preview.len() {
-            " ..."
-        } else {
-            ""
-        }
-    );
-
-    let selected_voice_name = selected_voice_name
-        .filter(|value| voices.iter().any(|voice| voice.name == **value))
-        .map(ToOwned::to_owned)
-        .unwrap_or_default();
-
-    let selected_voice_display_name = if selected_voice_name.is_empty() || voices.len() <= 1 {
-        "Default".to_string()
-    } else {
-        voices
-            .iter()
-            .find(|voice| voice.name == selected_voice_name)
-            .map(|voice| voice.display_name.clone())
-            .unwrap_or_else(|| "Default".to_string())
-    };
-
-    Ok(TtsVoiceRefresh {
-        available: true,
-        voices,
-        selected_voice_name,
-        selected_voice_display_name,
-    })
 }
 
 pub fn warm_tts_model(session: &TranslatorSession, language_code: &str) -> Result<bool, String> {
@@ -122,8 +80,8 @@ pub fn play_text_async(
     session: Arc<TranslatorSession>,
     language_code: String,
     text: String,
-    speech_speed: f32,
-    voice_name: Option<String>,
+    speech_speed: SpeechSpeed,
+    voice: Option<TtsVoiceSelection>,
     ui: UiCallbacks,
 ) {
     let generation = PLAYBACK_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
@@ -135,8 +93,8 @@ pub fn play_text_async(
             &session,
             &language_code,
             &text,
-            speech_speed,
-            voice_name.as_deref(),
+            speech_speed.value(),
+            voice.as_ref(),
             generation,
             &ui,
         );
@@ -197,7 +155,7 @@ fn play_text_streaming(
     language_code: &str,
     text: &str,
     speech_speed: f32,
-    voice_name: Option<&str>,
+    voice: Option<&TtsVoiceSelection>,
     generation: u64,
     ui: &UiCallbacks,
 ) -> Result<(), String> {
@@ -206,7 +164,7 @@ fn play_text_streaming(
         match session.plan_speech_chunks(
             language_code,
             text,
-            None,
+            voice.map(|voice| voice.pack_id.as_str()),
             translator::UrlsAndHashtags::Skip,
         ) {
             Ok(chunks) => Ok(Some(chunks)),
@@ -230,7 +188,7 @@ fn play_text_streaming(
     let (tx, rx) = sync_channel::<Result<QueuedAudioChunk, String>>(SYNTHESIS_QUEUE_DEPTH);
     let producer_session = Arc::clone(session);
     let producer_language_code = language_code.to_string();
-    let producer_voice_name = voice_name.map(ToOwned::to_owned);
+    let producer_voice = voice.cloned();
 
     thread::spawn(move || {
         produce_audio_chunks(
@@ -240,7 +198,7 @@ fn play_text_streaming(
             producer_session,
             producer_language_code,
             speech_speed,
-            producer_voice_name,
+            producer_voice,
         );
     });
 
@@ -282,7 +240,7 @@ fn produce_audio_chunks(
     session: Arc<TranslatorSession>,
     language_code: String,
     speech_speed: f32,
-    voice_name: Option<String>,
+    voice: Option<TtsVoiceSelection>,
 ) {
     for (chunk_index, chunk) in planned_chunks.into_iter().enumerate() {
         if PLAYBACK_GENERATION.load(Ordering::SeqCst) != generation {
@@ -302,9 +260,9 @@ fn produce_audio_chunks(
                 &language_code,
                 &chunk.content,
                 speech_speed,
-                voice_name.as_deref(),
+                voice.as_ref().and_then(|voice| voice.speaker.as_deref()),
                 chunk.is_phonemes,
-                None,
+                voice.as_ref().map(|voice| voice.pack_id.as_str()),
             ) {
                 Ok(audio) => Ok(audio),
                 Err(err) if err.is_missing_asset() => {
@@ -382,4 +340,18 @@ where
             "TTS runtime panicked".to_string()
         }
     })?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SpeechSpeed;
+
+    #[test]
+    fn speed_is_clamped_and_quantized() {
+        assert_eq!(SpeechSpeed::new(0.5).value(), SpeechSpeed::MIN);
+        assert_eq!(SpeechSpeed::new(3.0).value(), SpeechSpeed::MAX);
+        assert_eq!(SpeechSpeed::new(1.0).value(), 1.0);
+        assert!((SpeechSpeed::new(1.24).value() - 1.2).abs() < 1e-6);
+        assert!((SpeechSpeed::new(1.26).value() - 1.3).abs() < 1e-6);
+    }
 }

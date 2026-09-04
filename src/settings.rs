@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+
+use crate::model::TtsVoiceSelection;
 use std::fs;
 use std::path::Path;
 
@@ -28,7 +30,7 @@ pub struct Settings {
     #[serde(default = "default_tts_playback_speed")]
     pub tts_playback_speed: f32,
     #[serde(default)]
-    pub tts_voice_overrides: BTreeMap<String, String>,
+    pub tts_voice_selections: BTreeMap<String, TtsVoiceSelection>,
 }
 
 fn default_lang_code() -> String {
@@ -64,7 +66,7 @@ impl Default for Settings {
             show_transliteration_output: false,
             show_transliteration_input: false,
             tts_playback_speed: default_tts_playback_speed(),
-            tts_voice_overrides: BTreeMap::new(),
+            tts_voice_selections: BTreeMap::new(),
         }
     }
 }

@@ -601,55 +601,40 @@ Item {
                             font.bold: true
                         }
 
-                        Row {
+                        Item {
                             width: parent.width
-                            spacing: ui.dp(10)
+                            height: ui.dp(32)
 
-                            Rectangle {
-                                width: ui.dp(28)
-                                height: ui.dp(28)
-                                radius: ui.dp(8)
-                                color: theme.backgroundElevated
+                            DarkSlider {
+                                id: speedSlider
+                                theme: root.theme
+                                anchors.left: parent.left
+                                anchors.right: speedLabel.left
+                                anchors.rightMargin: ui.dp(8)
+                                anchors.verticalCenter: parent.verticalCenter
+                                height: ui.dp(32)
+                                from: appBridge.tts_playback_speed_min
+                                to: appBridge.tts_playback_speed_max
+                                stepSize: appBridge.tts_playback_speed_step
+                                snapMode: Slider.SnapAlways
+                                onMoved: appBridge.set_tts_playback_speed_value(value)
 
-                                Label {
-                                    anchors.centerIn: parent
-                                    text: "-"
-                                    color: theme.textPrimary
-                                    font.pixelSize: ui.dp(24)
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    onClicked: appBridge.set_tts_playback_speed_value(appBridge.tts_playback_speed - 0.1)
+                                Binding {
+                                    target: speedSlider
+                                    property: "value"
+                                    value: appBridge.tts_playback_speed
                                 }
                             }
 
                             Label {
-                                width: parent.width - ui.dp(76)
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                text: appBridge.tts_playback_speed.toFixed(2) + "x"
+                                id: speedLabel
+                                width: ui.dp(46)
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                horizontalAlignment: Text.AlignRight
+                                text: appBridge.tts_playback_speed.toFixed(1) + "x"
                                 color: theme.textPrimary
-                                font.pixelSize: ui.dp(21)
-                            }
-
-                            Rectangle {
-                                width: ui.dp(28)
-                                height: ui.dp(28)
-                                radius: ui.dp(8)
-                                color: theme.backgroundElevated
-
-                                Label {
-                                    anchors.centerIn: parent
-                                    text: "+"
-                                    color: theme.textPrimary
-                                    font.pixelSize: ui.dp(24)
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    onClicked: appBridge.set_tts_playback_speed_value(appBridge.tts_playback_speed + 0.1)
-                                }
+                                font.pixelSize: ui.dp(19)
                             }
                         }
 
@@ -729,18 +714,37 @@ Item {
                                     anchors.margins: ui.dp(1)
                                     clip: true
                                     model: speechOptionsPopup.voicePickerExpanded ? appBridge.tts_voice_options_model : null
+                                    section.property: "pack_display_name"
+                                    section.criteria: ViewSection.FullString
 
                                     ScrollIndicator.vertical: ScrollIndicator { }
 
+                                    section.delegate: Label {
+                                        width: voiceListView.width
+                                        visible: section.length > 0
+                                        height: visible ? implicitHeight : 0
+                                        text: section.toUpperCase()
+                                        color: theme.textSecondary
+                                        font.pixelSize: ui.dp(14)
+                                        font.bold: true
+                                        leftPadding: ui.dp(12)
+                                        topPadding: ui.dp(8)
+                                        bottomPadding: ui.dp(4)
+                                    }
+
                                     delegate: ItemDelegate {
+                                        required property string pack_id
                                         required property string name
                                         required property string display_name
+                                        required property string pack_display_name
 
                                         width: voiceListView.width
                                         text: display_name
-                                        highlighted: appBridge.tts_selected_voice_name === name
+                                        leftPadding: pack_display_name.length > 0 ? ui.dp(24) : ui.dp(12)
+                                        highlighted: appBridge.tts_selected_voice_pack_id === pack_id
+                                                     && appBridge.tts_selected_voice_name === name
                                         onClicked: {
-                                            appBridge.set_tts_voice_name(name)
+                                            appBridge.set_tts_voice(pack_id, name)
                                             speechOptionsPopup.voicePickerExpanded = false
                                         }
                                     }

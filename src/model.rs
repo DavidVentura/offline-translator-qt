@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Direction {
     FromOnly,
@@ -20,6 +22,31 @@ impl From<FeatureKind> for translator::Feature {
             FeatureKind::Tts => translator::Feature::Tts,
         }
     }
+}
+
+/// An installed voice pack plus, for multi-speaker packs, the speaker within it. Single-speaker
+/// packs carry no speaker: the synthesizer has no speaker map to look a name up in.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TtsVoiceSelection {
+    pub pack_id: String,
+    pub speaker: Option<String>,
+}
+
+/// One download attempt as the UI tracks it: the language row it belongs to, plus the specific
+/// voice pack when the user picked one, so the voice picker can show per-pack progress.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DownloadTarget {
+    pub code: String,
+    pub feature: FeatureKind,
+    pub tts_pack_id: Option<String>,
+}
+
+/// `Ended` fires whether the attempt succeeded or failed; the language list that follows it
+/// carries the outcome.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DownloadProgress {
+    Running(f32),
+    Ended,
 }
 
 #[derive(Clone, Debug, Default)]

@@ -34,10 +34,14 @@ pub struct ManageLanguageListItem {
     pub tts_progress: f32,
 }
 
+/// `pack_display_name` is set only for multi-speaker packs, where the main-screen list groups the
+/// speakers under their pack; single-speaker packs read as one voice named after the pack.
 #[derive(Clone, Default, SimpleListItem)]
 pub struct TtsVoiceListItem {
+    pub pack_id: QString,
     pub name: QString,
     pub display_name: QString,
+    pub pack_display_name: QString,
 }
 
 /// One merged selection highlight, in image-pixel space. QML scales these by the same factor it
@@ -60,11 +64,12 @@ pub struct DictionaryPopupRowItem {
 #[derive(Clone, Default, SimpleListItem)]
 pub struct ManageTtsVoicePackListItem {
     pub pack_id: QString,
-    pub region_display_name: QString,
+    pub section_text: QString,
     pub voice_display_name: QString,
-    pub quality_text: QString,
-    pub size_text: QString,
+    pub meta_text: QString,
     pub installed: bool,
+    pub queued: bool,
+    pub progress: f32,
 }
 
 pub(crate) fn language_to_list_item(language: Language) -> LanguageListItem {

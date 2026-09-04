@@ -69,6 +69,9 @@ enum IoEvent {
         code: String,
         feature: FeatureKind,
     },
+    DeleteTtsPack {
+        pack_id: String,
+    },
     SetAppPaths(AppPaths),
     TranslationRequest {
         text: String,
@@ -92,7 +95,6 @@ enum IoEvent {
     CancelDocumentTranslation,
     RefreshTtsVoices {
         language_code: String,
-        selected_voice_name: String,
     },
     WarmTtsModel {
         language_code: String,
@@ -100,8 +102,8 @@ enum IoEvent {
     SpeakRequest {
         language_code: String,
         text: String,
-        speech_speed: f32,
-        voice_name: String,
+        speech_speed: tts::SpeechSpeed,
+        voice: Option<model::TtsVoiceSelection>,
     },
     StopTts,
     Shutdown,

@@ -10,6 +10,7 @@ mod types;
 
 pub(crate) use self::core::UiScale;
 pub use callbacks::{ImageResult, UiCallbacks, create_ui_callbacks};
+pub use tts::installed_voice_items;
 pub use types::{
     DictionaryPopupRowItem, LanguageListItem, ManageLanguageListItem, ManageTtsVoicePackListItem,
     SelectionPillItem, TtsVoiceListItem,
@@ -22,7 +23,7 @@ use std::sync::mpsc::Sender;
 use translator::tarkka::WordWithTaggedEntries;
 
 use crate::IoEvent;
-use crate::model::{FeatureKind, Language, Screen};
+use crate::model::{FeatureKind, Language, Screen, TtsVoiceSelection};
 use crate::uri_handler::LaunchIntent;
 
 #[derive(QObject, Default)]
@@ -274,6 +275,12 @@ pub struct AppBridge {
 
     pub tts_playback_speed: qt_property!(f32; NOTIFY tts_playback_speed_changed),
     pub tts_playback_speed_changed: qt_signal!(),
+    pub tts_playback_speed_min: qt_property!(f32; CONST),
+    pub tts_playback_speed_max: qt_property!(f32; CONST),
+    pub tts_playback_speed_step: qt_property!(f32; CONST),
+
+    pub tts_selected_voice_pack_id: qt_property!(QString; NOTIFY tts_selected_voice_pack_id_changed),
+    pub tts_selected_voice_pack_id_changed: qt_signal!(),
 
     pub tts_selected_voice_name: qt_property!(QString; NOTIFY tts_selected_voice_name_changed),
     pub tts_selected_voice_name_changed: qt_signal!(),
@@ -648,9 +655,13 @@ pub struct AppBridge {
             self.set_tts_playback_speed_impl(value);
         }
     ),
-    pub set_tts_voice_name: qt_method!(
-        fn set_tts_voice_name(&mut self, value: QString) {
-            self.set_tts_voice_name_impl(value.to_string());
+    pub set_tts_voice: qt_method!(
+        fn set_tts_voice(&mut self, pack_id: QString, voice_name: QString) {
+            let speaker = voice_name.to_string();
+            self.set_tts_voice_impl(TtsVoiceSelection {
+                pack_id: pack_id.to_string(),
+                speaker: (!speaker.is_empty()).then_some(speaker),
+            });
         }
     ),
     pub open_tts_download_picker: qt_method!(
@@ -688,16 +699,12 @@ pub struct AppBridge {
     ),
     pub download_tts_pack: qt_method!(
         fn download_tts_pack(&mut self, pack_id: QString) {
-            if self.manage_tts_picker_language_code.is_empty() {
-                return;
-            }
-            self.send_feature_request(
-                self.manage_tts_picker_language_code.clone(),
-                FeatureKind::Tts,
-                true,
-                Some(pack_id.to_string()),
-            );
-            self.set_manage_tts_picker_open_value(false);
+            self.download_tts_pack_impl(pack_id.to_string());
+        }
+    ),
+    pub delete_tts_pack: qt_method!(
+        fn delete_tts_pack(&mut self, pack_id: QString) {
+            self.delete_tts_pack_impl(pack_id.to_string());
         }
     ),
 
@@ -777,7 +784,7 @@ pub struct AppBridge {
     asset_dir: String,
     config_dir: String,
     data_dir: String,
-    tts_voice_overrides: BTreeMap<String, String>,
+    tts_voice_selections: BTreeMap<String, TtsVoiceSelection>,
     tts_prewarmed_language_code: String,
     original_image_path: String,
     /// Both rendered layers, held so the original/translated flip is a swap rather than a re-run.
@@ -787,6 +794,7 @@ pub struct AppBridge {
     manage_filter: String,
     expanded_languages: HashSet<String>,
     manage_tts_picker_language_code: String,
+    manage_tts_pack_downloads: BTreeMap<String, tts::PackDownloadState>,
     /// A URI intent from the command line, held until the first language list lands: at startup the
     /// catalog snapshot is still empty, so `has_languages` cannot answer yet.
     pending_launch_intent: Option<LaunchIntent>,

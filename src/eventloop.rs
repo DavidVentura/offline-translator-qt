@@ -11,10 +11,10 @@ use crate::catalog_state::languages_from_overview;
 use crate::document::{self, DocumentError, DocumentEvent, DocumentProgress};
 use crate::download;
 use crate::image_ocr;
-use crate::model::FeatureKind;
+use crate::model::{DownloadProgress, DownloadTarget};
 use crate::rendered_image_item::qimage_from_rgba_bytes;
 use crate::tts;
-use crate::ui::{ImageResult, SelectionPillItem, TtsVoiceListItem, UiCallbacks};
+use crate::ui::{ImageResult, SelectionPillItem, UiCallbacks, installed_voice_items};
 use crate::{AppPaths, IoEvent};
 
 pub fn run_eventloop(bus_rx: Receiver<IoEvent>, ui: UiCallbacks, session: Arc<TranslatorSession>) {
@@ -39,23 +39,43 @@ pub fn run_eventloop(bus_rx: Receiver<IoEvent>, ui: UiCallbacks, session: Arc<Tr
                 feature,
                 selected_tts_pack_id,
             } => {
-                let Some(app_paths) = app_paths.clone() else {
-                    println!("no app path, cant download");
-                    continue;
+                let target = DownloadTarget {
+                    code,
+                    feature,
+                    tts_pack_id: selected_tts_pack_id,
                 };
-
-                if let Some(plan) =
-                    session.plan_download(&code, feature.into(), selected_tts_pack_id.as_deref())
-                    && let Err(err) = download_feature(&code, feature, &plan, &app_paths.data, &ui)
-                {
-                    eprintln!("Download failed for {code}: {err}");
+                match app_paths.clone() {
+                    None => println!("no app path, cant download"),
+                    Some(app_paths) => {
+                        let plan = session.plan_download(
+                            &target.code,
+                            target.feature.into(),
+                            target.tts_pack_id.as_deref(),
+                        );
+                        match plan {
+                            None => eprintln!("No download plan for {target:?}"),
+                            Some(plan) => {
+                                if let Err(err) =
+                                    download_feature(&target, &plan, &app_paths.data, &ui)
+                                {
+                                    eprintln!("Download failed for {}: {err}", target.code);
+                                }
+                            }
+                        }
+                    }
                 }
+                (ui.set_feature_progress)(target, DownloadProgress::Ended);
 
                 session.refresh_snapshot();
                 (ui.set_languages)(languages_from_overview(session.language_overview()));
             }
             IoEvent::DeleteLanguage { code, feature } => {
                 let delete_plan = session.prepare_delete(&code, feature.into());
+                session.apply_delete_plan(&delete_plan);
+                (ui.set_languages)(languages_from_overview(session.language_overview()));
+            }
+            IoEvent::DeleteTtsPack { pack_id } => {
+                let delete_plan = session.prepare_delete_tts_pack(&pack_id);
                 session.apply_delete_plan(&delete_plan);
                 (ui.set_languages)(languages_from_overview(session.language_overview()));
             }
@@ -79,41 +99,14 @@ pub fn run_eventloop(bus_rx: Receiver<IoEvent>, ui: UiCallbacks, session: Arc<Tr
                 println!("translation took {:?} = '{}'", start.elapsed(), text);
                 (ui.set_output_text)(text);
             }
-            IoEvent::RefreshTtsVoices {
-                language_code,
-                selected_voice_name,
-            } => {
-                match tts::load_tts_voices(
-                    &session,
-                    &language_code,
-                    (!selected_voice_name.is_empty()).then_some(selected_voice_name.as_str()),
-                ) {
-                    Ok(result) => {
-                        let mut items = vec![TtsVoiceListItem {
-                            name: String::new().into(),
-                            display_name: "Default".to_string().into(),
-                        }];
-                        items.extend(result.voices.into_iter().map(|voice| TtsVoiceListItem {
-                            name: voice.name.into(),
-                            display_name: voice.display_name.into(),
-                        }));
-                        (ui.set_tts_voices)(
-                            result.available,
-                            items,
-                            result.selected_voice_name,
-                            result.selected_voice_display_name,
-                        );
-                    }
-                    Err(err) => {
-                        eprintln!("Failed to load TTS voices: {err}");
-                        (ui.set_tts_voices)(
-                            false,
-                            Vec::new(),
-                            String::new(),
-                            "Default".to_string(),
-                        );
-                    }
-                }
+            IoEvent::RefreshTtsVoices { language_code } => {
+                let items = installed_voice_items(session.installed_tts_voices(&language_code));
+                eprintln!(
+                    "tts.voices: language={} installed {} voice(s)",
+                    language_code,
+                    items.len()
+                );
+                (ui.set_tts_voices)(items);
             }
             IoEvent::WarmTtsModel { language_code } => {
                 if let Err(err) = tts::warm_tts_model(&session, &language_code) {
@@ -124,14 +117,14 @@ pub fn run_eventloop(bus_rx: Receiver<IoEvent>, ui: UiCallbacks, session: Arc<Tr
                 language_code,
                 text,
                 speech_speed,
-                voice_name,
+                voice,
             } => {
                 tts::play_text_async(
                     Arc::clone(&session),
                     language_code,
                     text,
                     speech_speed,
-                    (!voice_name.is_empty()).then_some(voice_name),
+                    voice,
                     ui.clone(),
                 );
             }
@@ -301,8 +294,7 @@ fn spawn_document_job(
 }
 
 fn download_feature(
-    code: &str,
-    feature: FeatureKind,
+    target: &DownloadTarget,
     plan: &translator::DownloadPlan,
     data_path: &str,
     ui: &UiCallbacks,
@@ -311,12 +303,12 @@ fn download_feature(
     let total_downloaded = Arc::new(AtomicUsize::new(0));
     let download_complete = Arc::new(AtomicBool::new(false));
 
-    (ui.set_feature_progress)(code.to_string(), feature, 0.00001);
+    (ui.set_feature_progress)(target.clone(), DownloadProgress::Running(0.00001));
 
     let progress_total_downloaded = total_downloaded.clone();
     let progress_download_complete = download_complete.clone();
     let progress_ui = ui.clone();
-    let progress_code = code.to_string();
+    let progress_target = target.clone();
 
     let progress_thread = thread::spawn(move || {
         const UPDATE_THRESHOLD: usize = 1024 * 1024;
@@ -329,7 +321,10 @@ fn download_feature(
             let current = progress_total_downloaded.load(Ordering::Relaxed);
             if current.saturating_sub(last_update) >= UPDATE_THRESHOLD {
                 let percent = current as f32 / total_size as f32;
-                (progress_ui.set_feature_progress)(progress_code.clone(), feature, percent);
+                (progress_ui.set_feature_progress)(
+                    progress_target.clone(),
+                    DownloadProgress::Running(percent),
+                );
                 last_update = current;
             }
         }

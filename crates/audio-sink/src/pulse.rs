@@ -1,20 +1,38 @@
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_void};
+use std::time::Duration;
 
 use crate::error::AudioError;
 use crate::pcm::{BYTES_PER_FRAME, CHANNELS, SampleRate};
-use crate::wait::sleep_interruptibly;
 use crate::{Playback, StopSignal};
 
 const PA_STREAM_PLAYBACK: c_int = 1;
 const PA_SAMPLE_S16LE: c_int = 3;
+const PA_BUFFER_ATTR_DEFAULT: u32 = u32::MAX;
 const PLAYBACK_CHUNK_FRAMES: usize = 2_048;
+
+/// The server keeps this much audio queued and blocks writes beyond it, which paces the writer
+/// without a client-side clock. Deep enough to ride out scheduler jitter between writes; a stop
+/// flushes the queue, so it never delays cancellation.
+const TARGET_BUFFER: Duration = Duration::from_millis(400);
+/// Playback starts once this much is queued rather than waiting for the full target, so the
+/// first word is not held back.
+const PREBUFFER: Duration = Duration::from_millis(40);
 
 #[repr(C)]
 struct PaSampleSpec {
     format: c_int,
     rate: u32,
     channels: u8,
+}
+
+#[repr(C)]
+struct PaBufferAttr {
+    maxlength: u32,
+    tlength: u32,
+    prebuf: u32,
+    minreq: u32,
+    fragsize: u32,
 }
 
 #[repr(C)]
@@ -32,7 +50,7 @@ unsafe extern "C" {
         stream_name: *const c_char,
         ss: *const PaSampleSpec,
         map: *const c_void,
-        attr: *const c_void,
+        attr: *const PaBufferAttr,
         error: *mut c_int,
     ) -> *mut PaSimple;
     fn pa_simple_free(s: *mut PaSimple);
@@ -63,6 +81,13 @@ impl PulseBackend {
             rate: rate.hz(),
             channels: CHANNELS as u8,
         };
+        let buffer_attr = PaBufferAttr {
+            maxlength: PA_BUFFER_ATTR_DEFAULT,
+            tlength: bytes_for(rate, TARGET_BUFFER),
+            prebuf: bytes_for(rate, PREBUFFER),
+            minreq: PA_BUFFER_ATTR_DEFAULT,
+            fragsize: PA_BUFFER_ATTR_DEFAULT,
+        };
         let mut error = 0;
 
         let handle = unsafe {
@@ -74,7 +99,7 @@ impl PulseBackend {
                 c"Text to speech".as_ptr(),
                 &sample_spec,
                 std::ptr::null(),
-                std::ptr::null(),
+                &buffer_attr,
                 &mut error,
             )
         };
@@ -100,6 +125,8 @@ impl PulseBackend {
         samples: &[i16],
         stop: &mut dyn StopSignal,
     ) -> Result<Playback, AudioError> {
+        // Each write blocks until the server has room under TARGET_BUFFER, so the
+        // stop check between chunks runs about once per chunk of playback.
         for chunk in samples.chunks(PLAYBACK_CHUNK_FRAMES) {
             if stop.should_stop() {
                 self.discard()?;
@@ -107,16 +134,6 @@ impl PulseBackend {
             }
 
             self.write_chunk(chunk)?;
-
-            // The server buffers seconds of audio, so without pacing the loop
-            // finishes long before the sound does and a stop request arrives too
-            // late to cut anything.
-            if sleep_interruptibly(self.rate.duration_of(chunk.len()), stop)
-                == Playback::Interrupted
-            {
-                self.discard()?;
-                return Ok(Playback::Interrupted);
-            }
         }
 
         Ok(Playback::Completed)
@@ -175,6 +192,10 @@ impl Drop for PulseBackend {
     fn drop(&mut self) {
         unsafe { pa_simple_free(self.handle) };
     }
+}
+
+fn bytes_for(rate: SampleRate, duration: Duration) -> u32 {
+    u32::try_from(rate.frames_in(duration) * BYTES_PER_FRAME).expect("buffer target fits in u32")
 }
 
 fn pulse_error_message(error: c_int) -> String {

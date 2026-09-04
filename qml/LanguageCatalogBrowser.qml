@@ -19,12 +19,8 @@ Item {
         }
     }
 
-    function handleTtsFeatureAction(code, installed) {
-        if (installed) {
-            appBridge.delete_feature(code, 2)
-        } else {
-            appBridge.open_tts_download_picker(code)
-        }
+    function ttsActionIcon(installed) {
+        return installed ? appBridge.asset_url("settings.svg") : appBridge.asset_url("download.svg")
     }
 
     function toggleLanguage(code) {
@@ -57,7 +53,7 @@ Item {
         x: Math.round((parent.width - width) / 2)
         y: Math.round((parent.height - height) / 2)
         width: Math.min(parent.width - ui.dp(24), ui.dp(420))
-        height: Math.min(parent.height - ui.dp(80), ui.dp(520))
+        height: Math.min(parent.height - ui.dp(80), ui.dp(560))
         padding: 0
 
         background: Rectangle {
@@ -79,7 +75,19 @@ Item {
                 Layout.topMargin: ui.dp(18)
                 Layout.leftMargin: ui.dp(20)
                 Layout.rightMargin: ui.dp(20)
-                text: "Pick a voice"
+                text: appBridge.manage_tts_picker_language_name.toUpperCase()
+                color: theme.accentColor
+                font.pixelSize: ui.dp(14)
+                font.bold: true
+                font.letterSpacing: 1
+                elide: Text.ElideRight
+            }
+
+            Label {
+                Layout.fillWidth: true
+                Layout.leftMargin: ui.dp(20)
+                Layout.rightMargin: ui.dp(20)
+                text: "Voices"
                 color: "white"
                 font.pixelSize: ui.dp(29)
                 font.bold: true
@@ -88,14 +96,16 @@ Item {
             ListView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.topMargin: ui.dp(14)
+                Layout.topMargin: ui.dp(10)
                 Layout.leftMargin: ui.dp(14)
                 Layout.rightMargin: ui.dp(14)
                 clip: true
                 spacing: ui.dp(2)
                 model: appBridge.manage_tts_picker_model
-                section.property: "region_display_name"
+                section.property: "section_text"
                 section.criteria: ViewSection.FullString
+
+                ScrollIndicator.vertical: ScrollIndicator { }
 
                 section.delegate: Label {
                     width: ListView.view.width
@@ -104,19 +114,23 @@ Item {
                     font.pixelSize: ui.dp(19)
                     font.bold: true
                     leftPadding: ui.dp(4)
-                    topPadding: ui.dp(8)
+                    topPadding: ui.dp(10)
                     bottomPadding: ui.dp(4)
                 }
 
                 delegate: Item {
+                    id: voiceRow
                     required property string pack_id
                     required property string voice_display_name
-                    required property string quality_text
-                    required property string size_text
+                    required property string meta_text
                     required property bool installed
+                    required property bool queued
+                    required property real progress
+
+                    readonly property bool busy: queued || progress > 0
 
                     width: ListView.view.width
-                    height: ui.dp(46)
+                    height: ui.dp(50)
 
                     Column {
                         anchors.left: parent.left
@@ -129,17 +143,17 @@ Item {
                         Label {
                             width: parent.width
                             text: voice_display_name
-                            color: installed ? "#8A8E9F" : "#F1F3FB"
+                            color: "#F1F3FB"
                             font.pixelSize: ui.dp(21)
+                            font.bold: installed
                             elide: Text.ElideRight
                         }
 
                         Label {
                             width: parent.width
-                            text: size_text
+                            text: meta_text
                             color: "#A9ADBC"
-                            font.pixelSize: ui.dp(17)
-                            horizontalAlignment: Text.AlignLeft
+                            font.pixelSize: ui.dp(16)
                             elide: Text.ElideRight
                         }
                     }
@@ -149,31 +163,37 @@ Item {
                         anchors.right: parent.right
                         anchors.rightMargin: ui.dp(10)
                         anchors.verticalCenter: parent.verticalCenter
-                        width: installed ? ui.dp(62) : ui.dp(28)
-                        height: ui.dp(28)
+                        width: ui.dp(32)
+                        height: ui.dp(32)
 
-                        Label {
+                        CircularProgress {
                             anchors.centerIn: parent
-                            visible: installed
-                            text: "Installed"
-                            color: "#8A8E9F"
-                            font.pixelSize: ui.dp(16)
+                            visible: voiceRow.busy
+                            indeterminate: voiceRow.queued
+                            progress: voiceRow.progress
+                            progressColor: theme.accentColor
                         }
 
                         Image {
                             anchors.centerIn: parent
-                            visible: !installed
+                            visible: !busy
                             width: ui.dp(18)
                             height: ui.dp(18)
-                            source: appBridge.asset_url("download.svg")
+                            source: actionIcon(installed)
                             sourceSize.width: ui.dp(18)
                             sourceSize.height: ui.dp(18)
                         }
 
                         MouseArea {
                             anchors.fill: parent
-                            enabled: !installed
-                            onClicked: appBridge.download_tts_pack(pack_id)
+                            enabled: !busy
+                            onClicked: {
+                                if (installed) {
+                                    appBridge.delete_tts_pack(pack_id)
+                                } else {
+                                    appBridge.download_tts_pack(pack_id)
+                                }
+                            }
                         }
                     }
                 }
@@ -187,7 +207,7 @@ Item {
                     anchors.right: parent.right
                     anchors.rightMargin: ui.dp(18)
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Cancel"
+                    text: "Done"
                     flat: true
                     onClicked: appBridge.close_tts_download_picker()
 
@@ -561,13 +581,13 @@ Item {
                                 Image {
                                     anchors.centerIn: parent
                                     width: ui.dp(18); height: ui.dp(18)
-                                    source: actionIcon(tts_installed)
+                                    source: ttsActionIcon(tts_installed)
                                     sourceSize.width: ui.dp(18); sourceSize.height: ui.dp(18)
                                 }
 
                                 MouseArea {
                                     anchors.fill: parent
-                                    onClicked: handleTtsFeatureAction(code, tts_installed)
+                                    onClicked: appBridge.open_tts_download_picker(code)
                                 }
                             }
                         }

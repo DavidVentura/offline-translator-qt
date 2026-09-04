@@ -1,6 +1,6 @@
 use qmetaobject::{QString, QStringList};
 
-use crate::model::{Direction, FeatureKind, Language, Screen};
+use crate::model::{Direction, DownloadProgress, DownloadTarget, FeatureKind, Language, Screen};
 
 use super::AppBridge;
 use super::types::{
@@ -14,6 +14,7 @@ impl AppBridge {
         eprintln!("ui.set_languages_value: {} languages", languages.len());
         self.all_languages = languages;
         self.refresh_language_views();
+        self.refresh_manage_tts_picker_model();
 
         if self.current_screen == Screen::NoLanguages.as_i32() && self.has_languages {
             self.set_current_screen(Screen::Translation);
@@ -28,22 +29,29 @@ impl AppBridge {
 
     pub(crate) fn set_feature_progress_value(
         &mut self,
-        code: &str,
-        feature: FeatureKind,
-        progress: f32,
+        target: &DownloadTarget,
+        progress: DownloadProgress,
     ) {
+        if let Some(pack_id) = &target.tts_pack_id {
+            self.set_manage_tts_pack_progress(pack_id, progress);
+        }
+
         let Some(language) = self
             .all_languages
             .iter_mut()
-            .find(|language| language.code == code)
+            .find(|language| language.code == target.code)
         else {
             return;
         };
 
-        match feature {
-            FeatureKind::Core => language.core_progress = progress,
-            FeatureKind::Dictionary => language.dictionary_progress = progress,
-            FeatureKind::Tts => language.tts_progress = progress,
+        let fraction = match progress {
+            DownloadProgress::Running(fraction) => fraction,
+            DownloadProgress::Ended => 0.0,
+        };
+        match target.feature {
+            FeatureKind::Core => language.core_progress = fraction,
+            FeatureKind::Dictionary => language.dictionary_progress = fraction,
+            FeatureKind::Tts => language.tts_progress = fraction,
         }
 
         let language = language.clone();
