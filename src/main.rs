@@ -34,7 +34,7 @@ use translator::TranslatorSession;
 
 use crate::catalog_state::{bundled_catalog, languages_from_overview};
 use crate::model::FeatureKind;
-use crate::settings::load_settings;
+use crate::settings::{HttpServerBind, load_settings};
 use crate::ui::{AppBridge, create_ui_callbacks};
 use crate::uri_handler::LaunchIntent;
 
@@ -57,6 +57,7 @@ unsafe extern "C" {
 struct AppPaths {
     config: String,
     data: String,
+    cache: String,
 }
 
 enum IoEvent {
@@ -93,6 +94,15 @@ enum IoEvent {
         translate_pdf_images: bool,
     },
     CancelDocumentTranslation,
+    /// A config snapshot for the LibreTranslate-compatible server; the loop
+    /// only restarts it when the snapshot differs from the running one.
+    StartHttpServer {
+        port: u16,
+        bind: HttpServerBind,
+        ocr: translator::http::OcrSettings,
+        translate_pdf_images: bool,
+    },
+    StopHttpServer,
     RefreshTtsVoices {
         language_code: String,
     },
@@ -120,10 +130,14 @@ fn get_app_paths() -> AppPaths {
     let config_root = std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|| home.join(".config"));
+    let cache_root = std::env::var_os("XDG_CACHE_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home.join(".cache"));
 
     AppPaths {
         data: data_root.join(APP_NAME).display().to_string(),
         config: config_root.join(APP_NAME).display().to_string(),
+        cache: cache_root.join(APP_NAME).display().to_string(),
     }
 }
 
@@ -141,6 +155,7 @@ fn get_app_paths() -> AppPaths {
     AppPaths {
         data: local.join(APP_NAME).display().to_string(),
         config: roaming.join(APP_NAME).display().to_string(),
+        cache: local.join(APP_NAME).join("cache").display().to_string(),
     }
 }
 
@@ -192,16 +207,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         ));
         session.refresh_snapshot();
         let output = format!("{input}.{from}-{to}.out");
-        let cancel = std::sync::atomic::AtomicBool::new(false);
-        let result = document::translate_document(
+        let fonts = font_provider::system_fonts();
+        let options = translator::document::DocumentOptions {
+            forced_source_code: Some(&from),
+            target_code: &to,
+            translate_pdf_images: pdf_images,
+            txt_layout: translator::txt::TxtLayout::Preserve,
+            fonts: &*fonts,
+        };
+        let result = translator::document::translate_document_path(
             &session,
             &input,
             &output,
-            &from,
-            &to,
-            pdf_images,
-            &cancel,
+            &options,
             &|progress| eprintln!("doc progress: {progress:?}"),
+            &|| false,
         );
         eprintln!("doc result: {result:?} output={output}");
         return Ok(());
@@ -316,6 +336,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     bus_tx.send(IoEvent::SetAppPaths(app_paths)).unwrap();
+    app.pinned().borrow().sync_http_server();
     if let Some(intent) = uri_handler::intent_from_args(&args) {
         app.pinned().borrow_mut().defer_launch_intent(intent);
     }

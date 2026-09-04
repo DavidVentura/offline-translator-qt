@@ -264,6 +264,15 @@ pub struct AppBridge {
     pub catalog_index_url: qt_property!(QString; NOTIFY catalog_index_url_changed),
     pub catalog_index_url_changed: qt_signal!(),
 
+    pub http_server_enabled: qt_property!(bool; NOTIFY http_server_enabled_changed),
+    pub http_server_enabled_changed: qt_signal!(),
+    pub http_server_port: qt_property!(i32; NOTIFY http_server_port_changed),
+    pub http_server_port_changed: qt_signal!(),
+    pub http_server_bind_all: qt_property!(bool; NOTIFY http_server_bind_all_changed),
+    pub http_server_bind_all_changed: qt_signal!(),
+    pub http_server_status: qt_property!(QString; NOTIFY http_server_status_changed),
+    pub http_server_status_changed: qt_signal!(),
+
     pub disable_ocr: qt_property!(bool; NOTIFY disable_ocr_changed),
     pub disable_ocr_changed: qt_signal!(),
 
@@ -714,6 +723,7 @@ pub struct AppBridge {
                 self.ocr_background_mode = value;
                 self.ocr_background_mode_changed();
                 self.persist_settings();
+                self.sync_http_server();
             }
         }
     ),
@@ -723,6 +733,7 @@ pub struct AppBridge {
                 self.ocr_min_confidence = value;
                 self.ocr_min_confidence_changed();
                 self.persist_settings();
+                self.sync_http_server();
             }
         }
     ),
@@ -732,6 +743,41 @@ pub struct AppBridge {
                 self.ocr_max_image_size = value;
                 self.ocr_max_image_size_changed();
                 self.persist_settings();
+                self.sync_http_server();
+            }
+        }
+    ),
+    pub set_http_server_enabled_value: qt_method!(
+        fn set_http_server_enabled_value(&mut self, value: bool) {
+            if self.http_server_enabled != value {
+                self.http_server_enabled = value;
+                self.http_server_enabled_changed();
+                self.persist_settings();
+                self.sync_http_server();
+            }
+        }
+    ),
+    pub set_http_server_port_value: qt_method!(
+        fn set_http_server_port_value(&mut self, value: i32) {
+            let Ok(port) = u16::try_from(value) else {
+                return;
+            };
+            if port == 0 || self.http_server_port == value {
+                return;
+            }
+            self.http_server_port = value;
+            self.http_server_port_changed();
+            self.persist_settings();
+            self.sync_http_server();
+        }
+    ),
+    pub set_http_server_bind_all_value: qt_method!(
+        fn set_http_server_bind_all_value(&mut self, value: bool) {
+            if self.http_server_bind_all != value {
+                self.http_server_bind_all = value;
+                self.http_server_bind_all_changed();
+                self.persist_settings();
+                self.sync_http_server();
             }
         }
     ),

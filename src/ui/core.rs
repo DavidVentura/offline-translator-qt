@@ -5,7 +5,7 @@ use translator::TranslatorSession;
 
 use crate::IoEvent;
 use crate::model::{FeatureKind, Language, Screen};
-use crate::settings::{Settings, save_settings};
+use crate::settings::{HttpServerBind, Settings, save_settings};
 use crate::tts::SpeechSpeed;
 use crate::uri_handler::LaunchIntent;
 
@@ -117,7 +117,7 @@ impl AppBridge {
         let desktop_mode = Platform::detect().is_desktop();
         // Asked of the document dispatcher rather than of a cfg, so the picker's filters can
         // never drift from the extensions translate_document actually dispatches on.
-        let pdf_available = crate::document::supported_document_extension("probe.pdf").is_some();
+        let pdf_available = crate::document::DocumentFormat::from_extension("pdf").is_some();
         let scale_factor = ui_scale.factor(qt_ui_font_px);
         eprintln!("ui.scale: {ui_scale:?} factor={scale_factor}");
         let mut app = AppBridge {
@@ -172,6 +172,9 @@ impl AppBridge {
         app.tts_playback_speed_max = SpeechSpeed::MAX;
         app.tts_playback_speed_step = SpeechSpeed::STEP;
         app.tts_voice_selections = settings.tts_voice_selections.clone();
+        app.http_server_enabled = settings.http_server_enabled;
+        app.http_server_port = i32::from(settings.http_server_port);
+        app.http_server_bind_all = settings.http_server_bind == HttpServerBind::AllInterfaces;
 
         app.set_languages_value(languages);
 
@@ -205,8 +208,52 @@ impl AppBridge {
             show_transliteration_input: self.show_transliteration_input,
             tts_playback_speed: self.tts_playback_speed,
             tts_voice_selections: self.tts_voice_selections.clone(),
+            http_server_enabled: self.http_server_enabled,
+            http_server_port: self.http_server_port(),
+            http_server_bind: self.http_server_bind(),
         };
         save_settings(&self.config_dir, &settings);
+    }
+
+    fn http_server_port(&self) -> u16 {
+        u16::try_from(self.http_server_port).expect("port setter keeps the value in range")
+    }
+
+    fn http_server_bind(&self) -> HttpServerBind {
+        if self.http_server_bind_all {
+            HttpServerBind::AllInterfaces
+        } else {
+            HttpServerBind::Localhost
+        }
+    }
+
+    /// Push the current server settings to the IO thread, which starts, restarts,
+    /// or stops the server so it always matches them.
+    pub(crate) fn sync_http_server(&self) {
+        if !self.http_server_enabled {
+            self.send_io(IoEvent::StopHttpServer);
+            return;
+        }
+        self.send_io(IoEvent::StartHttpServer {
+            port: self.http_server_port(),
+            bind: self.http_server_bind(),
+            ocr: translator::http::OcrSettings {
+                max_image_size: self.ocr_max_image_size.max(0) as u32,
+                min_confidence: self.ocr_min_confidence.max(0) as u32,
+                background_mode: crate::image_ocr::map_background_mode(
+                    &self.ocr_background_mode.to_string(),
+                ),
+            },
+            translate_pdf_images: self.doc_translate_images,
+        });
+    }
+
+    pub(crate) fn set_http_server_status_value(&mut self, status: String) {
+        let status = QString::from(status);
+        if self.http_server_status != status {
+            self.http_server_status = status;
+            self.http_server_status_changed();
+        }
     }
 
     pub(crate) fn set_detected_language_code_value(&mut self, code: &str) {

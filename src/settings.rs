@@ -5,6 +5,14 @@ use crate::model::TtsVoiceSelection;
 use std::fs;
 use std::path::Path;
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HttpServerBind {
+    #[default]
+    Localhost,
+    AllInterfaces,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Settings {
     #[serde(default = "default_lang_code")]
@@ -31,6 +39,12 @@ pub struct Settings {
     pub tts_playback_speed: f32,
     #[serde(default)]
     pub tts_voice_selections: BTreeMap<String, TtsVoiceSelection>,
+    #[serde(default)]
+    pub http_server_enabled: bool,
+    #[serde(default = "default_http_server_port")]
+    pub http_server_port: u16,
+    #[serde(default)]
+    pub http_server_bind: HttpServerBind,
 }
 
 fn default_lang_code() -> String {
@@ -51,6 +65,9 @@ fn default_catalog_index_url() -> String {
 fn default_tts_playback_speed() -> f32 {
     1.0
 }
+fn default_http_server_port() -> u16 {
+    5000
+}
 
 impl Default for Settings {
     fn default() -> Self {
@@ -67,6 +84,9 @@ impl Default for Settings {
             show_transliteration_input: false,
             tts_playback_speed: default_tts_playback_speed(),
             tts_voice_selections: BTreeMap::new(),
+            http_server_enabled: false,
+            http_server_port: default_http_server_port(),
+            http_server_bind: HttpServerBind::Localhost,
         }
     }
 }

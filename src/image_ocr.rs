@@ -283,7 +283,7 @@ fn scaled_dimensions(width: u32, height: u32, max_image_size: u32) -> (u32, u32)
     }
 }
 
-fn map_background_mode(label: &str) -> BackgroundMode {
+pub(crate) fn map_background_mode(label: &str) -> BackgroundMode {
     match label {
         "Light Background" => BackgroundMode::BlackOnWhite,
         "Dark Background" => BackgroundMode::WhiteOnBlack,

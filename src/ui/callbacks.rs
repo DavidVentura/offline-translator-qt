@@ -30,6 +30,7 @@ pub struct UiCallbacks {
     pub notify_live_frame: Arc<dyn Fn() + Send + Sync>,
     pub set_detected_language_code: Arc<dyn Fn(String) + Send + Sync>,
     pub set_document_event: Arc<dyn Fn(DocumentEvent) + Send + Sync>,
+    pub set_http_server_status: Arc<dyn Fn(String) + Send + Sync>,
 }
 
 pub fn create_ui_callbacks(app: QPointer<AppBridge>) -> UiCallbacks {
@@ -117,6 +118,13 @@ pub fn create_ui_callbacks(app: QPointer<AppBridge>) -> UiCallbacks {
         }
     });
 
+    let http_status_app = app.clone();
+    let set_http_server_status = queued_callback(move |status: String| {
+        if let Some(app) = http_status_app.as_pinned() {
+            app.borrow_mut().set_http_server_status_value(status);
+        }
+    });
+
     UiCallbacks {
         set_languages: Arc::new(set_languages),
         set_feature_progress: Arc::new(move |target, progress| {
@@ -132,5 +140,6 @@ pub fn create_ui_callbacks(app: QPointer<AppBridge>) -> UiCallbacks {
         notify_live_frame: Arc::new(move || bump_live_frame_tick(())),
         set_detected_language_code: Arc::new(set_detected_language_code),
         set_document_event: Arc::new(set_document_event),
+        set_http_server_status: Arc::new(set_http_server_status),
     }
 }

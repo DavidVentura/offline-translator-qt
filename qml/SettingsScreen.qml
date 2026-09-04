@@ -161,6 +161,72 @@ Item {
 
             Item { Layout.preferredHeight: ui.dp(16) }
 
+            // ── API Server ──
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.leftMargin: ui.dp(16); Layout.rightMargin: ui.dp(16)
+                implicitHeight: apiCol.implicitHeight + ui.dp(32)
+                radius: ui.dp(12); color: theme.surfaceColor
+
+                ColumnLayout {
+                    id: apiCol
+                    anchors { left: parent.left; right: parent.right; top: parent.top; margins: ui.dp(16) }
+                    spacing: ui.dp(16)
+
+                    Label { text: "API Server"; color: theme.accentColor; font.pixelSize: ui.dp(24); font.bold: true }
+
+                    DarkSwitch {
+                        Layout.fillWidth: true; theme: root.theme
+                        label: "Enable LibreTranslate compatible HTTP server"
+                        checked: appBridge.http_server_enabled
+                        onToggled: appBridge.set_http_server_enabled_value(checked)
+                    }
+                    Label {
+                        Layout.fillWidth: true; wrapMode: Text.WordWrap
+                        text: "Allows other apps to programmatically request translations, and serves a web page for translating from a browser"
+                        color: theme.textSecondary; font.pixelSize: ui.dp(15)
+                    }
+
+                    ColumnLayout {
+                        visible: appBridge.http_server_enabled
+                        Layout.fillWidth: true
+                        spacing: ui.dp(16)
+
+                        ColumnLayout {
+                            Layout.fillWidth: true; spacing: ui.dp(6)
+                            Label { text: "Port"; color: theme.textSecondary; font.pixelSize: ui.dp(17) }
+                            TextField {
+                                Layout.fillWidth: true
+                                text: appBridge.http_server_port
+                                inputMethodHints: Qt.ImhDigitsOnly
+                                validator: IntValidator { bottom: 1; top: 65535 }
+                                color: theme.textPrimary
+                                placeholderTextColor: theme.textSecondary
+                                font.pixelSize: ui.dp(19)
+                                onEditingFinished: appBridge.set_http_server_port_value(parseInt(text))
+                                background: Rectangle { radius: ui.dp(8); color: theme.backgroundElevated; border.width: 1; border.color: theme.borderColor }
+                            }
+                        }
+
+                        DarkSwitch {
+                            Layout.fillWidth: true; theme: root.theme
+                            label: "Accept connections from other devices"
+                            checked: appBridge.http_server_bind_all
+                            onToggled: appBridge.set_http_server_bind_all_value(checked)
+                        }
+
+                        Label {
+                            Layout.fillWidth: true; wrapMode: Text.WordWrap
+                            visible: text.length > 0
+                            text: appBridge.http_server_status
+                            color: theme.textSecondary; font.pixelSize: ui.dp(15)
+                        }
+                    }
+                }
+            }
+
+            Item { Layout.preferredHeight: ui.dp(16) }
+
             // ── Advanced Settings ──
             Rectangle {
                 Layout.fillWidth: true

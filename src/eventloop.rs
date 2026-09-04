@@ -6,13 +6,15 @@ use std::time::{Duration, Instant};
 
 use cld2::{Format, detect_language};
 use translator::TranslatorSession;
+use translator::http::{BindAddress, HttpServer, HttpServerConfig};
 
 use crate::catalog_state::languages_from_overview;
-use crate::document::{self, DocumentError, DocumentEvent, DocumentProgress};
+use crate::document::{DocumentError, DocumentEvent, DocumentProgress};
 use crate::download;
 use crate::image_ocr;
 use crate::model::{DownloadProgress, DownloadTarget};
 use crate::rendered_image_item::qimage_from_rgba_bytes;
+use crate::settings::HttpServerBind;
 use crate::tts;
 use crate::ui::{ImageResult, SelectionPillItem, UiCallbacks, installed_voice_items};
 use crate::{AppPaths, IoEvent};
@@ -20,6 +22,7 @@ use crate::{AppPaths, IoEvent};
 pub fn run_eventloop(bus_rx: Receiver<IoEvent>, ui: UiCallbacks, session: Arc<TranslatorSession>) {
     let mut app_paths = None::<AppPaths>;
     let mut document_cancel = None::<Arc<AtomicBool>>;
+    let mut http_server = None::<(HttpServerConfig, HttpServer)>;
 
     while let Ok(msg) = bus_rx.recv() {
         match msg {
@@ -229,7 +232,61 @@ pub fn run_eventloop(bus_rx: Receiver<IoEvent>, ui: UiCallbacks, session: Arc<Tr
                     session.cancel_ongoing_work();
                 }
             }
+            IoEvent::StartHttpServer {
+                port,
+                bind,
+                ocr,
+                translate_pdf_images,
+            } => {
+                let Some(app_paths) = app_paths.as_ref() else {
+                    (ui.set_http_server_status)("app paths not initialized".to_string());
+                    continue;
+                };
+                let config = HttpServerConfig {
+                    bind: match bind {
+                        HttpServerBind::Localhost => BindAddress::Localhost,
+                        HttpServerBind::AllInterfaces => BindAddress::AllInterfaces,
+                    },
+                    port,
+                    output_dir: format!("{}/translate_file", app_paths.cache),
+                    ocr,
+                    translate_pdf_images,
+                };
+                if http_server
+                    .as_ref()
+                    .is_some_and(|(running, _)| *running == config)
+                {
+                    continue;
+                }
+                if let Some((_, server)) = http_server.take() {
+                    server.stop();
+                }
+                let sessions = Arc::clone(&session);
+                let started = translator::http::start(
+                    config.clone(),
+                    Arc::new(move || Some(Arc::clone(&sessions))),
+                    font_provider::system_fonts(),
+                );
+                let status = match started {
+                    Ok(server) => {
+                        let status = format!("Listening on {}", server.local_addr());
+                        http_server = Some((config, server));
+                        status
+                    }
+                    Err(error) => format!("Failed to start: {error}"),
+                };
+                (ui.set_http_server_status)(status);
+            }
+            IoEvent::StopHttpServer => {
+                if let Some((_, server)) = http_server.take() {
+                    server.stop();
+                }
+                (ui.set_http_server_status)(String::new());
+            }
             IoEvent::Shutdown => {
+                if let Some((_, server)) = http_server.take() {
+                    server.stop();
+                }
                 tts::stop_playback();
                 println!("shutdown signal, exiting");
                 break;
@@ -270,17 +327,23 @@ fn spawn_document_job(
         let output_path = document_output_path(&app_paths.data, &input_path, &from, &to);
         let start = Instant::now();
         let progress_ui = ui.clone();
-        let result = document::translate_document(
+        let fonts = font_provider::system_fonts();
+        let options = translator::document::DocumentOptions {
+            forced_source_code: Some(&from),
+            target_code: &to,
+            translate_pdf_images,
+            txt_layout: translator::txt::TxtLayout::Preserve,
+            fonts: &*fonts,
+        };
+        let result = translator::document::translate_document_path(
             &session,
             &input_path,
             &output_path,
-            &from,
-            &to,
-            translate_pdf_images,
-            &cancel,
+            &options,
             &move |progress: DocumentProgress| {
                 (progress_ui.set_document_event)(DocumentEvent::Progress(progress));
             },
+            &|| cancel.load(Ordering::Relaxed),
         );
         println!("document translation took {:?}", start.elapsed());
 

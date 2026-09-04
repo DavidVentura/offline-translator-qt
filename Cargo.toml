@@ -34,13 +34,13 @@ audio-sink = { path = "crates/audio-sink" }
 # git = "https://github.com/DavidVentura/translator-rs.git"
 path = "/home/david/git/translator-rs"
 default-features = false
-features = ["tts", "transliterate", "mucab", "dictionary", "ppocr", "pdf", "pdf-image-translate", "epub", "odt"]
+features = ["tts", "transliterate", "mucab", "dictionary", "ppocr", "pdf", "pdf-image-translate", "epub", "odt", "http"]
 
 [target.'cfg(windows)'.dependencies.translator]
 # git = "https://github.com/DavidVentura/translator-rs.git"
 path = "/home/david/git/translator-rs"
 default-features = false
-features = ["tts", "transliterate", "mucab", "dictionary", "ppocr", "epub", "odt", "image-render"]
+features = ["tts", "transliterate", "mucab", "dictionary", "ppocr", "epub", "odt", "image-render", "http"]
 
 [features]
 # Empty on purpose: features can't be target-gated the way the dependency above

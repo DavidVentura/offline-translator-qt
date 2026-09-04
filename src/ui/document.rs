@@ -2,7 +2,7 @@ use qmetaobject::QString;
 
 use crate::IoEvent;
 use crate::catalog_state::format_size;
-use crate::document::{DocumentEvent, DocumentProgress};
+use crate::document::{DocumentEvent, DocumentFormat, DocumentProgress};
 
 use super::AppBridge;
 
@@ -18,7 +18,7 @@ impl AppBridge {
             return;
         };
         let path_str = path.display().to_string();
-        let Some(ext) = crate::document::supported_document_extension(&path_str) else {
+        let Some(format) = DocumentFormat::from_path(&path_str) else {
             self.process_image_selection_impl(url);
             return;
         };
@@ -35,7 +35,7 @@ impl AppBridge {
         self.doc_file_name_changed();
         self.doc_file_size = QString::from(format_size(size));
         self.doc_file_size_changed();
-        let is_pdf = ext == "pdf";
+        let is_pdf = format.extension() == "pdf";
         if self.doc_is_pdf != is_pdf {
             self.doc_is_pdf = is_pdf;
             self.doc_is_pdf_changed();
